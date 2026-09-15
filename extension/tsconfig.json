@@ -1,0 +1,16 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noUnusedLocals": true
+  },
+  "include": [
+    "entrypoints",
+    "lib",
+    "permissions.mjs",
+    "wxt.config.ts",
+    ".wxt/**/*",
+    "../reference/src/**/*.mjs"
+  ]
+}

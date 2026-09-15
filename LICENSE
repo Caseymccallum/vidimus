@@ -19,21 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-## Note on scope
-
-The MIT licence above covers the code: everything under `reference/`, `scripts/` and `spec/`.
-
-`docs/RECEIPT-SPEC.md` is a specification rather than a program, and it is offered under
-**Creative Commons Attribution 4.0 International (CC BY 4.0)** so that anyone may implement,
-translate or vend it, including in a product, on the condition that the source is credited.
-
-That split is deliberate, and it is the one thing in this repository that exists to make adoption
-easier rather than to satisfy a licence checklist: a format that cannot be freely reimplemented is
-not a format, it is a product with a file extension. The whole point of a receipt is that a stranger
-can check it, and a stranger cannot check it with software they are not allowed to write.
-
-The published vector digests, the fixture recipes and the decision record are covered by the same
-permission as the specification: they are part of it, not part of the code.

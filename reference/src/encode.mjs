@@ -48,3 +48,36 @@ export function toBase64(bytes) {
   }
   return btoa(binary);
 }
+
+/**
+ * base64url, without padding: the form the claim uses for public keys and signatures, because they
+ * travel in JSON and sometimes in a URL.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+/**
+ * base64url, without padding: the form the claim uses for public keys and signatures, because they
+ * travel in JSON and sometimes in a URL.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+export function toBase64Url(bytes) {
+  return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Decode base64 back to bytes, without `Buffer` - the pair to `toBase64Url`, and needed wherever a
+ * stored key is read back (a browser's extension storage holds JSON, so a key has to be a string).
+ *
+ * @param {string} value
+ * @returns {Uint8Array}
+ */
+export function fromBase64Url(value) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}

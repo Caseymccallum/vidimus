@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vidimus</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0; width: 22rem;
+        font: 13px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { padding: 14px; display: grid; gap: 10px; }
+      h1 { margin: 0; font-size: 15px; letter-spacing: 0.01em; }
+      #where { margin: 0; opacity: 0.75; word-break: break-all; }
+      button {
+        font: inherit; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+        border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+        background: color-mix(in srgb, currentColor 8%, transparent); color: inherit;
+      }
+      button[disabled] { opacity: 0.5; cursor: default; }
+      pre {
+        margin: 0; padding: 10px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap;
+        background: color-mix(in srgb, currentColor 7%, transparent);
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #note { margin: 0; font-size: 12px; opacity: 0.75; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Seal what this page says</h1>
+      <p id="where">Looking at the current tab…</p>
+      <button id="seal" disabled>Seal this page</button>
+      <pre id="result" hidden></pre>
+      <p id="note"></p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

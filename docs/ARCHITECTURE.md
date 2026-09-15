@@ -295,6 +295,31 @@ the published vectors, the million-character vector, every length around a block
 64 - where padding bugs live), and agreement with `node:crypto` on real fixture bytes. If the two ever
 disagree, the suite says so rather than a receipt failing to verify for an unexplainable reason.
 
+### D-020 - The extension lives here, imports the format, and asks for the least it can
+
+`extension/` is a WXT and TypeScript Manifest V3 extension that seals the page you are reading. It is in
+this repository rather than beside it for one reason: it imports `capture.mjs`, `claim.mjs` and the rest
+of the format, so there is exactly one definition of what a capture and a claim are, and the browser
+producer cannot drift from the command-line one.
+
+Three decisions inside it are worth recording:
+
+1. **Every permission carries a written reason** (`extension/permissions.mjs`). The manifest is built
+   from that file and a test fails if a permission appears without one. The list is `storage`,
+   `scripting`, `webRequest` and `<all_urls>`: the host permission is what makes a response status
+   observable, and without it the claim would carry no `status` and no `content_type`. That is a real
+   trade, written down rather than assumed, and it is the first one to revisit.
+2. **The signing key never leaves the browser**, and is never synced. It is generated with WebCrypto the
+   first time it is needed and kept in `chrome.storage.local`.
+3. **The browser logic is plain ESM in `extension/lib/`**, not TypeScript, so that the project's own test
+   suite can run it in Node with Node's WebCrypto and check what it produces with the reference
+   verifier. A browser is needed to *use* this extension, not to know that it works.
+
+**What it cannot do yet**, named rather than implied: it cannot verify its own output, because the
+verifier needs Node; and its capture is the document as rendered rather than the bytes the server sent,
+because Manifest V3 cannot read a response body. Both are in `docs/CONFORMANCE.md` as gaps with what
+closing them would take.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,
@@ -306,6 +331,9 @@ disagree, the suite says so rather than a receipt failing to verify for an unexp
   would be decoration.
 - **A network layer.** Level 3 is specified and not performed. A caller that wants it performs the
   fetch and reports the result separately; D-005 forbids folding it into `verified`.
-- **The browser shell that drives the capture.** `capture.mjs` turns a page's facts into a WACZ, and the
-  extension that gathers those facts - the rendered DOM, the observed status and headers - is the next
-  piece of work. What is missing is the shell, not the engine.
+- **In-browser verification.** The shell seals a receipt and cannot check it, which needs a WebCrypto
+  verification path and a pure inflate for reading a container - the mirror images of the two pieces the
+  capture path already has.
+- **A richer capture.** What it holds is the document as rendered, without the stylesheets and images
+  around it. The format has a question to answer first: a claim does not yet say which kind of capture
+  it holds (section 13 of the specification).

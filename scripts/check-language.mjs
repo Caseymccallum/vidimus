@@ -28,8 +28,10 @@ import { GATE_OPT_OUT } from './gate-exemptions.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Directories that hold no prose of ours. */
-const SKIP_DIRECTORIES = new Set(['node_modules', '.git', 'fixtures', 'test-results']);
+/** Directories that hold no prose of ours: vendored code, generated output, and other people's files. */
+const SKIP_DIRECTORIES = new Set([
+  'node_modules', '.git', 'fixtures', 'test-results', '.output', '.wxt', 'dist', 'build',
+]);
 
 /**
  * Files this gate must not read, because they have to contain the words it looks for.
@@ -102,6 +104,7 @@ const AMERICAN = [
  */
 const ALLOWED = new Map([
   ['normalization', 'a wire-format field name, spelled as Unicode spells it (Normalization Forms)'],
+  ['normalize', "Node's `path.normalize`, which is an API name rather than anything we write"],
   ['resize', 'not an -ize verb: re + size'], ['resizes', 'not an -ize verb: re + size'],
   ['resized', 'not an -ize verb: re + size'], ['resizing', 'not an -ize verb: re + size'],
   ['size', 'not an -ize verb'], ['sizes', 'not an -ize verb'],

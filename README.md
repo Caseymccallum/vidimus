@@ -9,7 +9,7 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-94-3DA639)](#verify-the-claims-yourself)
+[![Tests](https://img.shields.io/badge/tests-100-3DA639)](#verify-the-claims-yourself)
 [![Vectors](https://img.shields.io/badge/vectors-34-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
@@ -52,7 +52,7 @@ both facts true, both reported, neither hidden behind the other.
 > detect. [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) is the full list, ordered by how easy each
 > one is to misread.
 
-> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 94 tests,
+> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 100 tests,
 > 34 conformance vectors, no dependencies. The extension that will make a receipt in one click is the
 > next piece of work. The format had to be checkable before anything wrote it at scale.
 
@@ -67,6 +67,8 @@ both facts true, both reported, neither hidden behind the other.
 - **It refuses to guess.** A capture it cannot read stops the seal, because a document digest nobody
   measured is a falsehood inside a signature rather than a missed check.
 - **It verifies what it has just written**, and deletes the file if its own output does not check out.
+- **One button in the browser**, too: [`extension/`](extension/README.md) seals the page you are reading,
+  with a key that never leaves the profile and a permission list that carries a reason per entry.
 
 ### The receipt
 
@@ -139,9 +141,9 @@ exists today:
 - 34 conformance vectors, rebuilt and re-hashed on every run;
 - six gates, run by `npm run verify` and by CI on Linux and Windows.
 
-What does not exist yet is the browser shell: the extension that reads the page, calls the capture core,
-seals the receipt and keeps the key. That order was deliberate - a format had to be checkable, then
-producible, before anything produced it at scale.
+The browser shell exists now too, in `extension/`: one button that seals the page you are reading,
+importing the format rather than reimplementing it, and keeping its signing key in the browser.
+[`extension/README.md`](extension/README.md) says exactly what it can and cannot do.
 
 ## Quick start
 
@@ -239,7 +241,8 @@ scripts/     the gates: check-syntax.mjs, check-language.mjs, check-docs.mjs
 
 ## Licence
 
-MIT for the code. **CC BY 4.0** for [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md).
+MIT for the code. **CC BY 4.0** for [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md); the reasoning
+behind both is in [`docs/LICENSING.md`](docs/LICENSING.md).
 
 Both are deliberate. The code is permissive so it can be used anywhere; the specification is freely
 reimplementable so that it can become a format rather than a product with a file extension.

@@ -15,18 +15,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const sourceOf = (name) => readFileSync(join(here, '..', 'src', name), 'utf8');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const sourceOf = (pathFromRoot) => readFileSync(join(root, pathFromRoot), 'utf8');
 
-/** The modules a capturing extension bundles, and everything they import. */
-const ENTRY = 'capture.mjs';
+/** The entry points a browser bundles, as paths from the repository root. */
+const ENTRIES = ['reference/src/capture.mjs', 'extension/lib/sealing.mjs'];
 
 /** Relative imports, which is what a module graph is made of here. */
-function relativeImports(source) {
-  return [...source.matchAll(/from\s+'(\.[^']+)'/g)].map((match) => match[1].replace('./', ''));
+/** Relative imports, resolved against the file that made them, because the graph now spans two trees. */
+function relativeImports(from, source) {
+  return [...source.matchAll(/from\s+'(\.[^']+)'/g)]
+    .map((match) => normalize(join(dirname(from), match[1])).split('\\').join('/'));
 }
 
 /**
@@ -44,7 +46,7 @@ function withoutComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-/** Every module reachable from the entry point, in the order it is reached. */
+/** Every module reachable from an entry point, in the order it is reached. */
 function reachable(entry) {
   const seen = [];
   const queue = [entry];
@@ -52,36 +54,46 @@ function reachable(entry) {
     const name = queue.shift();
     if (seen.includes(name)) continue;
     seen.push(name);
-    queue.push(...relativeImports(withoutComments(sourceOf(name))));
+    queue.push(...relativeImports(name, withoutComments(sourceOf(name))));
   }
   return seen;
 }
 
-test('the modules a browser bundles reach nothing in Node', () => {
-  const modules = reachable(ENTRY);
-  assert.ok(modules.length > 3, 'the entry point should have a graph, not a stub');
+test('everything a browser bundles reaches nothing in Node', () => {
+  for (const entry of ENTRIES) {
+    const modules = reachable(entry);
+    assert.ok(modules.length > 3, `${entry} should have a graph, not a stub`);
 
-  for (const name of modules) {
-    const source = withoutComments(sourceOf(name));
-    for (const imported of relativeImports(source)) {
+    for (const name of modules) {
+      const source = withoutComments(sourceOf(name));
+      for (const imported of relativeImports(name, source)) {
+        assert.ok(
+          !imported.startsWith('node:'),
+          `${name} imports ${imported}, which does not exist in a browser`,
+        );
+      }
       assert.ok(
-        !imported.startsWith('node:'),
-        `${name} imports ${imported}, which does not exist in a browser`,
+        !/\bBuffer\b/.test(source),
+        `${name} uses Buffer, which does not exist in a browser`,
       );
     }
-    assert.ok(
-      !/\bBuffer\b/.test(source),
-      `${name} uses Buffer, which does not exist in a browser`,
-    );
   }
 });
 
-test('the entry point does not quietly acquire a Node dependency', () => {
-  // `capture.mjs` is what the extension imports. If it ever reaches `digest.mjs`, `signature.mjs`,
-  // `zip.mjs`, `warc.mjs`, `seal.mjs` or `fixtures.mjs`, the split has been undone.
-  const modules = reachable(ENTRY);
+test('the entry points do not quietly acquire a Node dependency', () => {
+  // `capture.mjs` and the extension's `sealing.mjs` are what a browser bundles. If either ever reaches
+  // `digest.mjs`, `signature.mjs`, `zip.mjs`, `warc.mjs`, `seal.mjs`, `fixtures.mjs` or `verify.mjs`,
+  // the reader/writer split has been undone.
   const forbidden = ['digest.mjs', 'signature.mjs', 'zip.mjs', 'warc.mjs', 'seal.mjs', 'fixtures.mjs', 'verify.mjs'];
-  for (const name of forbidden) {
-    assert.ok(!modules.includes(name), `capture.mjs now reaches ${name}, which needs Node`);
+  for (const entry of ENTRIES) {
+    const modules = reachable(entry).map((module) => module.split('/').pop());
+    for (const name of forbidden) {
+      // Compared by file name, not by suffix: `gzip.mjs` ends with the string `zip.mjs`, and a check
+      // that cannot tell those apart fails on the writer it is supposed to be protecting.
+      assert.ok(
+        !modules.includes(name),
+        `${entry} now reaches ${name}, which needs Node`,
+      );
+    }
   }
 });

@@ -34,17 +34,16 @@ import { canonicalise, assertCanonicalBytes, CanonicalJsonError } from './canoni
 import { sha256, isSha256Hex, utf8 } from './digest.mjs';
 import { readZip } from './zip.mjs';
 import { verifyMessage, keyId, ED25519_ALG, decodeBase64Url } from './signature.mjs';
+import { SPEC_VERSION, signedSubtree, signingMessage } from './claim.mjs';
+
+/**
+ * Re-exported from `claim.mjs`, where they live because a producer needs them and the verifier does not
+ * own them. Every caller of this module keeps working; the definitions moved, the names did not.
+ */
+export { SPEC_VERSION, signedSubtree, signingMessage };
 
 /** The specification version this verifier implements. */
 export const VERIFIER_VERSION = '0.1.0';
-
-/**
- * The specification version a *producer* writes into a new claim.
- *
- * One constant, in one module, because a fixture, a sealer and a verifier that disagree about the
- * format version produce receipts that verify nowhere for a reason nobody can see.
- */
-export const SPEC_VERSION = '0.1.0';
 
 /** Spec versions whose major number this verifier understands. */
 export const SUPPORTED_MAJOR = 0;
@@ -90,32 +89,6 @@ export const LEVELS = [
 
 /** Field name for the claim digest. Kept in one place so the spec can cite it. */
 export const CLAIM_HASH_FIELD = 'claim_hash';
-
-/** The domain-separation prefix for signature messages, per major specification version.
- *
- * Frozen, and looked up rather than interpolated, for one reason: this string is inside
- * every signature ever produced, so editing it silently invalidates every receipt already
- * in the world. It carries the project's name because a domain separator that does not say
- * who owns the protocol separates nothing.
- *
- * A future rename therefore adds an entry for a *new* major version and leaves this one
- * alone. See `docs/ARCHITECTURE.md` D-013 and D-015, and section 6.4 of the specification.
- */
-const SIGNING_PREFIX_BY_MAJOR = new Map([[0, 'vidimus/claim/']]);
-
-/**
- * The message a signature covers: `vidimus/claim/<spec_version>:<claim_hash>`.
- *
- * @param {string} specVersion
- * @param {string} claimHash
- * @returns {Uint8Array | null} Null when there is no prefix for that major version.
- */
-export function signingMessage(specVersion, claimHash) {
-  const major = Number.parseInt(String(specVersion).split('.')[0], 10);
-  const prefix = SIGNING_PREFIX_BY_MAJOR.get(major);
-  if (prefix === undefined) return null;
-  return utf8(`${prefix}${specVersion}:${claimHash}`);
-}
 
 /**
  * @param {unknown} value
@@ -291,38 +264,6 @@ export function isSafeEntryName(value) {
   if (value.includes(':')) return false;
   if (value.includes('//')) return false;
   return !value.split('/').some((segment) => segment === '' || segment === '.' || segment === '..');
-}
-
-/**
- * The part of a manifest the signature covers: everything except `signature`, and except an
- * `rfc3161` anchor.
- *
- * `signature` is excluded because a signature cannot cover itself (D-006).
- *
- * The anchor rule is the interesting one, and it comes from a hole that showed up while
- * writing section 6.1 of the spec rather than from a test: **an anchor that could have
- * existed when the claim was signed is signed; one that cannot be is not.** A chain link
- * knows its `sequence` and `prev_claim_hash` before the claim hash exists, and
- * `{"type":"none"}` is a statement the author makes at signing time, so both are inside the
- * signed subtree and neither can be added or edited afterwards. An RFC 3161 token is a
- * *response* to a digest, so it cannot be inside the thing it commits to - and it does not
- * need to be, because it independently commits to the claim hash, so editing it can only
- * make verification fail or produce an anchor that must itself be validated, never turn a
- * false claim into a passing level.
- *
- * Leaving every anchor outside the signature (the obvious implementation) would have let
- * anyone add `{"type":"chain","sequence":1}` to an unanchored receipt and turn L2 from
- * "not checked" into "verified" - which is precisely the kind of unearned tick this format
- * exists to make impossible (D-011).
- *
- * @param {Record<string, any>} manifest
- * @returns {Record<string, any>}
- */
-export function signedSubtree(manifest) {
-  const rest = { ...manifest };
-  delete rest.signature;
-  if (isObject(rest.anchor) && rest.anchor.type === 'rfc3161') delete rest.anchor;
-  return rest;
 }
 
 /**

@@ -26,7 +26,7 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 94 tests: the canonical form's rules, the container reader, the verifier's invariants, and the vectors. |
+| `npm test` | 100 tests: the canonical form's rules, the container reader, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. |
@@ -101,7 +101,7 @@ Named here, with what each would take, so that none of them is mistaken for a de
 | **Level 3 (currency)** | Not performed at all | A specified comparison: what to fetch, what to compare, and a report format for "the bytes changed and the words did not". It must stay outside `verified`, and it must be impossible to trigger by accident. |
 | **Size limits** | `container.readable` accepts any declared entry size | A cap applied before inflating, and a status for a receipt that exceeds it. Recorded as a limitation in the specification and the threat model so that it is not mistaken for a design choice. |
 | **A second implementation** | Section 11's conformance list | Another language reading the same vectors. Until then the vectors pin one implementation's answers, which is agreement rather than corroboration, and the threat model says as much. |
-| **The browser shell** | `capture.mjs` makes a WACZ, but nothing gathers the facts it needs | The extension that reads the rendered DOM and the observed response headers, calls `capture.mjs`, seals the receipt and keeps the key. The engine exists and is tested; the shell does not. |
+| **In-browser verification** | `extension/` seals a receipt but cannot check its own work | The verifier needs Node's `crypto` and a synchronous digest; making it browser-safe means a WebCrypto verification path and a pure inflate for reading the container, which are the mirror images of the two pieces the capture path already has. Until then the popup tells the user to run `vidimus verify`. |
 
 ## 7. Adding a check
 

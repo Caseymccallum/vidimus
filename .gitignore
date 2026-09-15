@@ -5,6 +5,9 @@ spec/fixtures/
 # Nothing else here should ever be needed, but these are the local conveniences that
 # would otherwise end up in a diff: editor state, package manager noise, OS litter.
 node_modules/
+# The extension's build output and the types WXT generates from the manifest.
+extension/.output/
+extension/.wxt/
 *.log
 .DS_Store
 Thumbs.db
