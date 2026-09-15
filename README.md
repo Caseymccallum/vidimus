@@ -9,7 +9,7 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-100-3DA639)](#verify-the-claims-yourself)
+[![Tests](https://img.shields.io/badge/tests-105-3DA639)](#verify-the-claims-yourself)
 [![Vectors](https://img.shields.io/badge/vectors-34-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
@@ -52,7 +52,7 @@ both facts true, both reported, neither hidden behind the other.
 > detect. [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) is the full list, ordered by how easy each
 > one is to misread.
 
-> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 100 tests,
+> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 105 tests,
 > 34 conformance vectors, no dependencies. The extension that will make a receipt in one click is the
 > next piece of work. The format had to be checkable before anything wrote it at scale.
 

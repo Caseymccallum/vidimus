@@ -23,7 +23,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CASES } from './cases.mjs';
-import { CHECKS, LEVELS, VERIFIER_VERSION, verifyReceipt } from './verify.mjs';
+import { CHECKS, LEVELS, VERIFIER_VERSION, verifyReceipt } from './verify-node.mjs';
 import { SPEC_VERSION } from './fixtures.mjs';
 import { sha256 } from './digest.mjs';
 
@@ -104,7 +104,7 @@ function record(verdict) {
  * Build every case, assert the written-down expectation, and return the vector document.
  * @returns {{ document: Record<string, any>, fixtures: Map<string, Uint8Array>, problems: string[] }}
  */
-export function buildVectors() {
+export async function buildVectors() {
   const problems = [];
   const fixtures = new Map();
   const seen = new Set();
@@ -115,7 +115,7 @@ export function buildVectors() {
     seen.add(testCase.id);
 
     const bytes = testCase.build();
-    const verdict = verifyReceipt(bytes, testCase.options ?? {});
+    const verdict = await verifyReceipt(bytes, testCase.options ?? {});
     problems.push(...expectationProblems(testCase.id, verdict, testCase.expect));
 
     // A verdict must always describe every check, in the declared order. This is the
@@ -221,8 +221,13 @@ function writeFixture(file, bytes) {
 
 /** @returns {void} */
 function main() {
+  return mainAsync();
+}
+
+/** @returns {Promise<void>} */
+async function mainAsync() {
   const mode = process.argv[2];
-  const { document, fixtures, problems } = buildVectors();
+  const { document, fixtures, problems } = await buildVectors();
 
   if (problems.length > 0) {
     console.error('the implementation does not match the written-down expectations:');
@@ -269,5 +274,5 @@ function main() {
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  main();
+  await main();
 }

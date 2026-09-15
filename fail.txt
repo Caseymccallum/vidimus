@@ -1,0 +1,19 @@
+﻿=====
+not ok 34 - a container this verifier cannot read is unsupported, not failed
+  ---
+  duration_ms: 2.089
+  type: 'test'
+  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\extension.test.mjs:148:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'unsupported'
+    - 'not_checked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'not_checked'
+  actual: 'unsupported'
+  operator: 'strictEqual'

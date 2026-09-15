@@ -16,6 +16,10 @@
 
 import { createPrivateKey, createPublicKey, randomBytes, sign, verify } from 'node:crypto';
 import { sha256, toBase64Url, fromBase64Url, toHex } from './digest.mjs';
+import { ED25519_ALG } from './claim.mjs';
+
+/** Re-exported: the algorithm's name belongs to the claim's shape, and lives where the shape does. */
+export { ED25519_ALG };
 
 /** PKCS#8 prefix for an Ed25519 private key: the 32-byte seed follows it. */
 const PKCS8_ED25519_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
@@ -26,11 +30,6 @@ const SPKI_ED25519_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 /** Raw key length, and therefore signature length, in bytes. */
 export const ED25519_KEY_BYTES = 32;
 export const ED25519_SIGNATURE_BYTES = 64;
-
-/**
- * The label a receipt must use for this algorithm. Changing it is a spec change.
- */
-export const ED25519_ALG = 'ed25519';
 
 /**
  * @param {Uint8Array} seed Exactly 32 bytes.

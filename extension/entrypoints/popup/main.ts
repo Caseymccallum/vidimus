@@ -15,6 +15,7 @@ import { browser } from 'wxt/browser';
 
 import { fromBase64Url, toBase64Url } from '../../../reference/src/encode.mjs';
 import { generateKey } from '../../lib/keys.mjs';
+import { checkReceipt } from '../../lib/checking.mjs';
 import { sealPage } from '../../lib/sealing.mjs';
 
 /** Where the key lives. Local storage only: there is no sync, and no server to sync it with. */
@@ -160,16 +161,27 @@ async function seal(): Promise<void> {
       key,
     });
 
+    // D-017, in the browser: a receipt this program has not checked is not handed over. The same rule
+    // the command line follows, now that the verifier can run here at all.
+    const verdict = await checkReceipt(sealed.bytes);
+    if (verdict.verified !== true) {
+      say(verdict.summary.join('\n'));
+      fail(
+        `This receipt did not check out (integrity ${verdict.levels.L0.status}, `
+        + `attribution ${verdict.levels.L1.status}), so it was not saved. That is a bug in this `
+        + 'extension rather than anything you did.',
+      );
+      return;
+    }
+
     const name = fileNameFor(observation.url);
     save(sealed.bytes, name);
     say([
-      `sealed    ${observation.url}`,
-      `status    ${observation.status}`,
-      `document  ${sealed.document.bytes} bytes, sha256 ${sealed.document.sha256.slice(0, 16)}…`,
-      `claim     ${sealed.claimHash}`,
-      `key       ${key.keyId.slice(0, 16)}…`,
+      ...verdict.summary,
+      '',
+      `file      ${name}`,
     ].join('\n'));
-    if (note) note.textContent = `Signed on this machine. To check it: vidimus verify ${name}`;
+    if (note) note.textContent = `Signed and checked here. vidimus verify ${name} checks it elsewhere.`;
   } catch (error) {
     fail(`Could not seal this page: ${error instanceof Error ? error.message : String(error)}`);
   } finally {

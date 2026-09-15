@@ -320,6 +320,35 @@ verifier needs Node; and its capture is the document as rendered rather than the
 because Manifest V3 cannot read a response body. Both are in `docs/CONFORMANCE.md` as gaps with what
 closing them would take.
 
+### D-021 - The verifier takes a runtime, because a browser cannot check a signature synchronously
+
+The verifier's *rules* are shared; its *primitives* are not. So `verifyReceipt` takes a `runtime`
+supplying four things - a digest, a container reader, a key id, and a signature check - and everything on
+a command line gets the Node one through `verify-node.mjs`, a one-line wrapper that exists so that no call
+site has to care.
+
+The forcing constraint is signature verification. Node's `crypto.verify` is synchronous; a browser's only
+option is `crypto.subtle.verify`, which returns a promise. Rather than write a curve implementation in
+JavaScript to preserve a synchronous API - and a hand-rolled verifier is precisely what WebCrypto exists
+to avoid - the verifier awaits its runtime, and one `await` travels up through the CLI, the vectors
+runner and the tests.
+
+Two consequences worth naming:
+
+1. **A runtime may declare a limit instead of a verdict.** An error carrying `code: 'unsupported'` means
+   *this* verifier cannot read *that kind* of container, and the check reports `unsupported` rather than
+   `fail`. The browser's reader is store-only, so a deflated container written by another tool is a gap
+   in the verifier rather than a fault in the receipt - and calling that a failure would be a lie in the
+   safer direction, which is still a lie.
+2. **The two runtimes are pinned to each other by a test** that does not merely assert that both pass: it
+   asserts that the two verdicts are identical, reason for reason. Two runtimes can agree on an outcome
+   and still disagree about why.
+
+**Rejected:** a synchronous hand-written Ed25519 verification, and a second verifier written for the
+browser. The first is a security decision - verification code that silently accepts a bad signature would
+be the worst possible bug in this project - and the second is the duplication this repository exists to
+avoid.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

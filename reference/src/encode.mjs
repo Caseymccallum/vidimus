@@ -68,9 +68,6 @@ export function toBase64Url(bytes) {
 }
 
 /**
- * Decode base64 back to bytes, without `Buffer` - the pair to `toBase64Url`, and needed wherever a
- * stored key is read back (a browser's extension storage holds JSON, so a key has to be a string).
- *
  * @param {string} value
  * @returns {Uint8Array}
  */
@@ -80,4 +77,14 @@ export function fromBase64Url(value) {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
+}
+
+/**
+ * True for a 64-character lowercase hex digest, which is the only form the claim admits.
+ *
+ * @param {unknown} value
+ * @returns {value is string}
+ */
+export function isSha256Hex(value) {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 }

@@ -27,7 +27,7 @@
  */
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { exitCode, verifyReceipt } from './verify.mjs';
+import { exitCode, verifyReceipt } from './verify-node.mjs';
 import { SealError, sealFromCapture } from './seal.mjs';
 import { fromBase64Url, toBase64Url } from './digest.mjs';
 import { generateSeed, keyId, privateKeyFromSeed, rawPublicKey } from './signature.mjs';
@@ -214,10 +214,10 @@ function read(file) {
 }
 
 /** @param {string} file @param {Record<string, any>} options @param {boolean} json */
-function verify(file, options, json) {
+async function verify(file, options, json) {
   let verdict;
   try {
-    verdict = verifyReceipt(read(file), options);
+    verdict = await verifyReceipt(read(file), options);
   } catch (error) {
     console.error(`${file}: could not be read: ${error.message}`);
     return 2;
@@ -243,8 +243,8 @@ function verify(file, options, json) {
 }
 
 /** @param {string} file */
-function inspect(file) {
-  const verdict = verifyReceipt(read(file));
+async function inspect(file) {
+  const verdict = await verifyReceipt(read(file));
   const printable = {
     verifier: verdict.verifier,
     receipt: verdict.receipt,
@@ -357,7 +357,7 @@ function keygen(options) {
  * @param {Record<string, any>} options
  * @returns {number}
  */
-function sealCapture(options) {
+async function sealCapture(options) {
   let capture;
   try {
     capture = read(options.capture);
@@ -422,7 +422,7 @@ function sealCapture(options) {
   console.log('');
   console.log('checking what was just written:');
 
-  const status = verify(out, {}, options.json === true);
+  const status = await verify(out, {}, options.json === true);
   if (status === 0) return 0;
 
   unlinkSync(out);
@@ -437,12 +437,12 @@ if (parsed === null) {
   for (const line of USAGE) console.error(line);
   process.exitCode = 2;
 } else if (parsed.command === 'inspect') {
-  process.exitCode = inspect(parsed.file);
+  process.exitCode = await inspect(parsed.file);
 } else if (parsed.command === 'seal') {
-  process.exitCode = sealCapture(parsed);
+  process.exitCode = await sealCapture(parsed);
 } else if (parsed.command === 'keygen') {
   process.exitCode = keygen(parsed);
 } else {
-  process.exitCode = verify(parsed.file, parsed.options, parsed.json);
+  process.exitCode = await verify(parsed.file, parsed.options, parsed.json);
 }
 

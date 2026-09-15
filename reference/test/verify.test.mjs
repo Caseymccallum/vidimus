@@ -24,7 +24,7 @@ import {
   signingMessage,
   signedSubtree,
   validateManifestShape,
-} from '../src/verify.mjs';
+} from '../src/verify-node.mjs';
 import { buildReceipt } from '../src/fixtures.mjs';
 import { canonicalise } from '../src/canonical.mjs';
 import { sha256 } from '../src/digest.mjs';
@@ -39,9 +39,9 @@ const built = CASES.map((testCase) => ({
   options: testCase.options ?? {},
   verdict: null,
 }));
-for (const entry of built) entry.verdict = verifyReceipt(entry.bytes, entry.options);
+for (const entry of built) entry.verdict = await verifyReceipt(entry.bytes, entry.options);
 
-test('every verdict reports every check, exactly once, in the declared order', () => {
+test('every verdict reports every check, exactly once, in the declared order', async () => {
   const expected = CHECKS.map((check) => check.id);
   for (const { id, verdict } of built) {
     const actual = verdict.checks.map((check) => check.id);
@@ -49,7 +49,7 @@ test('every verdict reports every check, exactly once, in the declared order', (
   }
 });
 
-test('every check that is not a pass says why', () => {
+test('every check that is not a pass says why', async () => {
   for (const { id, verdict } of built) {
     for (const check of verdict.checks) {
       if (check.status === 'pass') continue;
@@ -61,7 +61,7 @@ test('every check that is not a pass says why', () => {
   }
 });
 
-test('a level passes only when every check in it passes', () => {
+test('a level passes only when every check in it passes', async () => {
   for (const { id, verdict } of built) {
     for (const level of LEVELS) {
       const checks = verdict.checks.filter((check) => check.level === level.id);
@@ -79,7 +79,7 @@ test('a level passes only when every check in it passes', () => {
   }
 });
 
-test('verified means integrity and attribution, and nothing else is folded in', () => {
+test('verified means integrity and attribution, and nothing else is folded in', async () => {
   for (const { id, verdict } of built) {
     const anyFail = verdict.checks.some((check) => check.status === 'fail');
     const expected = !anyFail
@@ -89,7 +89,7 @@ test('verified means integrity and attribution, and nothing else is folded in', 
   }
 });
 
-test('the exit code has three states and they mean what the CLI says they mean', () => {
+test('the exit code has three states and they mean what the CLI says they mean', async () => {
   for (const { id, verdict } of built) {
     const anyFail = verdict.checks.some((check) => check.status === 'fail');
     const expected = anyFail ? 2 : (verdict.verified ? 0 : 1);
@@ -100,15 +100,15 @@ test('the exit code has three states and they mean what the CLI says they mean',
   assert.deepEqual([...seen].sort(), [0, 1, 2], 'every exit code must be exercised');
 });
 
-test('a verdict is deterministic: the same bytes give the same answer, twice', () => {
+test('a verdict is deterministic: the same bytes give the same answer, twice', async () => {
   for (const { id, bytes, options } of built) {
-    const first = verifyReceipt(bytes, options);
-    const second = verifyReceipt(bytes, options);
+    const first = await verifyReceipt(bytes, options);
+    const second = await verifyReceipt(bytes, options);
     assert.equal(JSON.stringify(first), JSON.stringify(second), `${id} is not reproducible`);
   }
 });
 
-test('every check has been seen not passing at least once', () => {
+test('every check has been seen not passing at least once', async () => {
   const nonPass = new Set();
   for (const { verdict } of built) {
     for (const check of verdict.checks) {
@@ -119,7 +119,7 @@ test('every check has been seen not passing at least once', () => {
   assert.deepEqual(never, [], 'a check that has never been seen failing is not a check');
 });
 
-test('each level reaches a pass somewhere, except the one this verifier cannot check', () => {
+test('each level reaches a pass somewhere, except the one this verifier cannot check', async () => {
   const passes = new Set();
   for (const { verdict } of built) {
     for (const level of LEVELS) {
@@ -132,7 +132,7 @@ test('each level reaches a pass somewhere, except the one this verifier cannot c
   // L3 pass appears here is the day that document is out of date.
 });
 
-test('the summary never says a level is verified unless it is', () => {
+test('the summary never says a level is verified unless it is', async () => {
   for (const { id, verdict } of built) {
     for (const level of LEVELS) {
       const line = verdict.summary.find((text) => text.startsWith(`L${level.id.slice(1)} `));
@@ -147,7 +147,7 @@ test('the summary never says a level is verified unless it is', () => {
   }
 });
 
-test('the verifier does not reach outside the bytes it was handed', () => {
+test('the verifier does not reach outside the bytes it was handed', async () => {
   // The same shape of gate Sentinel runs over its source and its bundle: the claim "this
   // checks nothing over the network and reads no clock" is enforced by scanning the code,
   // not by intending it. `digest.mjs` and `signature.mjs` are excluded because they import
@@ -176,7 +176,7 @@ test('the verifier does not reach outside the bytes it was handed', () => {
   }
 });
 
-test('the check table is its own guardrail', () => {
+test('the check table is its own guardrail', async () => {
   const ids = CHECKS.map((check) => check.id);
   assert.equal(new Set(ids).size, ids.length, 'check ids must be unique');
   const levels = new Set(LEVELS.map((level) => level.id));
@@ -193,7 +193,7 @@ test('the check table is its own guardrail', () => {
   }
 });
 
-test('a level rolls up by the rule the spec states, not by majority', () => {
+test('a level rolls up by the rule the spec states, not by majority', async () => {
   const state = (statuses) => ({ results: statuses.map((status, index) => ({ id: `c${index}`, status })) });
   const levelOf = (statuses) => rollUpLevel(
     { ...state(statuses), results: state(statuses).results.map((result) => ({ ...result, level: 'L0' })) },
@@ -209,7 +209,7 @@ test('a level rolls up by the rule the spec states, not by majority', () => {
   assert.equal(levelOf(['not_applicable', 'not_checked']), 'not_checked');
 });
 
-test('entry names are confined to the container they came from', () => {
+test('entry names are confined to the container they came from', async () => {
   const allowed = ['capture.wacz', 'attestations/signature.json', 'a/b/c.txt'];
   const refused = [
     '', '/etc/passwd', 'C:/windows/system32', 'a\\b', 'a//b', 'a/./b', '../x', 'a/../b',
@@ -219,7 +219,7 @@ test('entry names are confined to the container they came from', () => {
   for (const name of refused) assert.ok(!isSafeEntryName(name), `${JSON.stringify(name)} should be refused`);
 });
 
-test('the signed subtree excludes the signature, and only a post-hoc anchor', () => {
+test('the signed subtree excludes the signature, and only a post-hoc anchor', async () => {
   // `buildReceipt` defaults to `{"type":"none"}`, which is a statement made at signing time
   // and is therefore covered by the signature.
   const { manifest } = buildReceipt();
@@ -248,7 +248,7 @@ test('the signed subtree excludes the signature, and only a post-hoc anchor', ()
   assert.notEqual(canonicalise(signedSubtree(withExtra)), canonicalise(signed));
 });
 
-test('the signature message format is pinned, because it is wire format', () => {
+test('the signature message format is pinned, because it is wire format', async () => {
   const hash = 'ab'.repeat(32);
   assert.deepEqual(
     new TextDecoder().decode(signingMessage('0.1.0', hash)),
@@ -260,7 +260,7 @@ test('the signature message format is pinned, because it is wire format', () => 
   assert.equal(signingMessage('9.0.0', hash), null);
 });
 
-test('shape validation names every problem it finds', () => {
+test('shape validation names every problem it finds', async () => {
   const good = buildReceipt().manifest;
   assert.deepEqual(validateManifestShape(good), []);
 

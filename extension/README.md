@@ -16,18 +16,22 @@ the two producers cannot drift apart (D-018).
    generated on first use and kept in `chrome.storage.local`.
 4. The file is handed to the browser's downloads through a link, so no `downloads` permission is needed.
 
-## What it cannot do yet
+## What it does and does not do
 
-- **Check its own receipt.** The verifier needs Node's `crypto` and a synchronous digest, so it lives on
-  the command line: run `vidimus verify <file>` afterwards. The CLI refuses to hand over a receipt it has
-  not checked; this shell cannot keep that promise yet, and says so rather than implying otherwise.
-- **Capture subresources.** The capture holds the document as it was rendered, not the stylesheets and
-  images around it. It does not claim more than that, but nothing in the claim yet *says* which kind of
-  capture it is - see section 13 of the specification, where a `capture.profile` field is proposed.
-- **Ask for fewer permissions than it does.** `<all_urls>` is what makes the status line observable;
-  without it the claim would carry no `status` and no `content_type` (both optional in the format). That
-  is the trade to revisit first, and it is written down here so that it is a decision rather than a
-  detail.
+- **It checks its own receipt before handing it over.** The verifier runs here, on the same rules the
+  command line uses (D-021): if what it has just written does not verify, the file is not saved and the
+  popup says so. The two runtimes are pinned together by a test that asserts their verdicts are identical,
+  reason for reason.
+- **It cannot read a deflated container.** Its reader is store-only, because a browser's decompression is
+  asynchronous and this reader is not. Every receipt this project writes is stored uncompressed, so the
+  limit costs nothing for its own output; another tool's container may need the command line, and the
+  check reports `unsupported` rather than pretending.
+- **It captures the document as rendered**, not the stylesheets and images around it. Nothing in the claim
+  yet *says* which kind of capture it is - see section 13 of the specification, where a `capture.profile`
+  field is proposed.
+- **It asks for `<all_urls>`.** That host permission is what makes a response status observable; without
+  it the claim would carry no `status` and no `content_type` (both optional in the format). A real trade,
+  and the first one to revisit.
 
 ## Permissions
 

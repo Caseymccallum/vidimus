@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { CaptureError, buildCapture, buildWarcRecord } from '../src/capture.mjs';
 import { findCaptureWarc, sealFromCapture } from '../src/seal.mjs';
 import { findMainDocument } from '../src/warc.mjs';
-import { verifyReceipt } from '../src/verify.mjs';
+import { verifyReceipt } from '../src/verify-node.mjs';
 import { signer } from '../src/fixtures.mjs';
 import { sha256 } from '../src/digest.mjs';
 
@@ -34,7 +34,7 @@ function capture(overrides = {}) {
   return buildCapture({ ...FACTS, ...overrides });
 }
 
-test('a capture made the way a browser will make it seals into a receipt that verifies', () => {
+test('a capture made the way a browser will make it seals into a receipt that verifies', async () => {
   const made = capture();
   const sealed = sealFromCapture({
     capture: made.wacz,
@@ -50,13 +50,13 @@ test('a capture made the way a browser will make it seals into a receipt that ve
   assert.equal(sealed.manifest.subject.status, 200);
   assert.equal(sealed.manifest.subject.content_type, 'text/html; charset=utf-8');
 
-  const verdict = verifyReceipt(sealed.bytes);
+  const verdict = await verifyReceipt(sealed.bytes);
   assert.equal(verdict.verified, true);
   assert.equal(verdict.levels.L0.status, 'pass');
   assert.equal(verdict.levels.L1.status, 'pass');
 });
 
-test('the reader gets back exactly what the writer put in', () => {
+test('the reader gets back exactly what the writer put in', async () => {
   const made = capture();
   const document = findMainDocument(findCaptureWarc(made.wacz), FACTS.url);
 
@@ -68,7 +68,7 @@ test('the reader gets back exactly what the writer put in', () => {
   assert.equal(document.url, FACTS.url);
 });
 
-test('a length that described the wire is never passed off as describing the capture', () => {
+test('a length that described the wire is never passed off as describing the capture', async () => {
   // The page's own Content-Length describes bytes that no longer exist, because the body is now the
   // rendered document. Leaving it in would make the record claim a length it does not have, and the
   // reader - which trusts that field - would refuse the capture it had just been handed.
@@ -79,14 +79,14 @@ test('a length that described the wire is never passed off as describing the cap
   assert.equal(findMainDocument(findCaptureWarc(made.wacz), FACTS.url).status, 200);
 });
 
-test('the same facts produce the same bytes, twice', () => {
+test('the same facts produce the same bytes, twice', async () => {
   // Which is only true because the record identifier is derived from the content rather than drawn at
   // random, and because the writer takes its timestamps from the capture rather than from a clock.
   assert.deepEqual(capture().wacz, capture().wacz);
   assert.deepEqual(capture().record, capture().record);
 });
 
-test('a redirect is recorded as where the document came from', () => {
+test('a redirect is recorded as where the document came from', async () => {
   const made = capture({ finalUrl: 'https://example.org/after-the-redirect' });
   const warc = findCaptureWarc(made.wacz);
   assert.equal(findMainDocument(warc, 'https://example.org/after-the-redirect').url,
@@ -94,7 +94,7 @@ test('a redirect is recorded as where the document came from', () => {
   assert.match(text(warc), /WARC-Target-URI: https:\/\/example\.org\/after-the-redirect/);
 });
 
-test('headers can arrive in any of the shapes a browser offers them', () => {
+test('headers can arrive in any of the shapes a browser offers them', async () => {
   const common = { url: FACTS.url, status: 200, capturedAt: FACTS.capturedAt, body: FACTS.html };
   const asObject = buildWarcRecord({ ...common, headers: { 'Content-Type': 'text/html' } });
   const asMap = buildWarcRecord({ ...common, headers: new Map([['Content-Type', 'text/html']]) });
@@ -105,7 +105,7 @@ test('headers can arrive in any of the shapes a browser offers them', () => {
   assert.match(latin1(asObject), /Content-Type: text\/html/);
 });
 
-test('a page of three hundred thousand characters is captured without falling over', () => {
+test('a page of three hundred thousand characters is captured without falling over', async () => {
   // The base64 in the record's own digest is why this test exists: a naive `String.fromCharCode(...)`
   // throws on a payload this size, on exactly the pages people most want to keep.
   const html = `<!doctype html><p>${'wide '.repeat(60_000)}</p>`;
@@ -114,7 +114,7 @@ test('a page of three hundred thousand characters is captured without falling ov
   assert.equal(text(findMainDocument(findCaptureWarc(made.wacz), FACTS.url).body), html);
 });
 
-test('facts that do not add up to a capture are refused, each by name', () => {
+test('facts that do not add up to a capture are refused, each by name', async () => {
   const refusals = [
     [{ url: 'not a url' }, /not absolute/],
     [{ url: 'ftp://example.org/file' }, /http or https/],
@@ -140,7 +140,7 @@ test('facts that do not add up to a capture are refused, each by name', () => {
   }
 });
 
-test('the record it writes is one the reader would accept on its own', () => {
+test('the record it writes is one the reader would accept on its own', async () => {
   // The payload digest this module writes is the one `warc.mjs` checks, so this assertion is the
   // writer and the reader agreeing about a value that neither would notice disagreeing about
   // otherwise: a wrong one would simply make every capture look corrupt.

@@ -31,10 +31,10 @@
  */
 
 import { canonicalise, assertCanonicalBytes, CanonicalJsonError } from './canonical.mjs';
-import { sha256, isSha256Hex, utf8 } from './digest.mjs';
-import { readZip } from './zip.mjs';
-import { verifyMessage, keyId, ED25519_ALG, decodeBase64Url } from './signature.mjs';
-import { SPEC_VERSION, signedSubtree, signingMessage } from './claim.mjs';
+import { fromBase64Url, isSha256Hex, utf8 } from './encode.mjs';
+import {
+  ED25519_ALG, SPEC_VERSION, claimHashOf, signedSubtree, signingMessage,
+} from './claim.mjs';
 
 /**
  * Re-exported from `claim.mjs`, where they live because a producer needs them and the verifier does not
@@ -124,11 +124,22 @@ function isObject(value) {
  *   summary: string[],
  * }}
  */
-export function verifyReceipt(bytes, options = {}) {
+export async function verifyReceipt(bytes, options = {}) {
+  const runtime = options.runtime;
+  if (runtime === undefined) {
+    // Named error rather than a silent default, because there is no *silent* default that works in both
+    // runtimes: importing the Node primitives here would make this module unimportable in a browser, and
+    // guessing would be exactly the sort of convenience that hides a mistake. `verify-node.mjs` is the
+    // one-line wrapper that supplies them on a command line.
+    throw new Error(
+      'verifyReceipt needs a runtime: import the Node one from verify-node.mjs, or pass your own',
+    );
+  }
+
   const state = newState();
 
-  const shapeOk = verifyContainer(bytes, state);
-  if (shapeOk) verifyCapture(state);
+  const shapeOk = await verifyContainer(bytes, state, runtime);
+  if (shapeOk) await verifyCapture(state, runtime);
   recordGaps(state, 'L0', gapReason(state, 'L0'));
 
   if (state.manifest === null) {
@@ -137,7 +148,7 @@ export function verifyReceipt(bytes, options = {}) {
     recordGaps(state, 'L2', reason);
     recordGaps(state, 'L3', reason);
   } else {
-    verifySignature(state, options);
+    await verifySignature(state, options, runtime);
     recordGaps(state, 'L1', gapReason(state, 'L1'));
     verifyAnchor(state, options);
     recordGaps(state, 'L2', gapReason(state, 'L2'));
@@ -417,12 +428,18 @@ function record(state, id, status, reason) {
  * @param {VerificationState} state
  * @returns {boolean} Whether the claim is intact enough to keep going.
  */
-function verifyContainer(bytes, state) {
+async function verifyContainer(bytes, state, runtime) {
   let archive;
   try {
-    archive = readZip(bytes);
+    archive = await runtime.readContainer(bytes);
   } catch (error) {
-    record(state, 'container.readable', 'fail', error.message ?? String(error));
+    // A runtime is allowed to declare a limit rather than a verdict. An error carrying
+    // `code: 'unsupported'` means this verifier cannot read *this kind* of container, which is a gap in
+    // the verifier rather than a fault in the receipt - and reporting that as a failure would be a lie
+    // in the safer direction, which is still a lie (D-021).
+    const unsupported = /** @type {any} */ (error).code === 'unsupported';
+    record(state, 'container.readable', unsupported ? 'unsupported' : 'fail',
+      error.message ?? String(error));
     return false;
   }
   record(state, 'container.readable', 'pass');
@@ -497,7 +514,7 @@ function verifyContainer(bytes, state) {
   const fixed = canonicalise(JSON.parse(once)) === once;
   record(state, 'claim.digest', fixed ? 'pass' : 'fail',
     fixed ? undefined : 'canonicalisation is not a fixed point for this claim');
-  state.claimHash = sha256(once);
+  state.claimHash = claimHashOf(manifest);
 
   const problems = validateManifestShape(manifest);
   record(state, 'manifest.shape', problems.length === 0 ? 'pass' : 'fail',
@@ -522,7 +539,7 @@ function verifyContainer(bytes, state) {
  * @param {VerificationState} state
  * @returns {boolean}
  */
-function verifyCapture(state) {
+async function verifyCapture(state, runtime) {
   const manifest = /** @type {Record<string, any>} */ (state.manifest);
   const capture = manifest.capture;
 
@@ -538,7 +555,7 @@ function verifyCapture(state) {
       ? undefined
       : `the capture is ${captureBytes.length} bytes, and the receipt says ${capture.bytes}`);
 
-  const actualDigest = sha256(captureBytes);
+  const actualDigest = await runtime.digest(captureBytes);
   record(state, 'capture.digest', actualDigest === capture.sha256 ? 'pass' : 'fail',
     actualDigest === capture.sha256
       ? undefined
@@ -553,7 +570,7 @@ function verifyCapture(state) {
 
   let inner;
   try {
-    inner = readZip(captureBytes);
+    inner = await runtime.readContainer(captureBytes);
   } catch (error) {
     record(state, 'capture.wacz.readable', 'fail', `the capture is not a readable WACZ: ${error.message}`);
     return false;
@@ -602,7 +619,7 @@ function verifyCapture(state) {
         `resource "${where}" is advertised but is not in the capture`);
       return false;
     }
-    const actual = `sha256:${sha256(contents)}`;
+    const actual = `sha256:${await runtime.digest(contents)}`;
     if (actual !== advertised) {
       record(state, 'capture.wacz.resources', 'fail',
         `resource "${where}" hashes to ${actual}, and the capture advertises ${advertised}`);
@@ -635,7 +652,7 @@ function verifyCapture(state) {
  * @param {VerificationState} state
  * @param {{ trustedKeys?: string[] }} options
  */
-function verifySignature(state, options) {
+async function verifySignature(state, options, runtime) {
   const manifest = /** @type {Record<string, any>} */ (state.manifest);
   const signature = manifest.signature;
 
@@ -664,15 +681,15 @@ function verifySignature(state, options) {
   let rawPublicKey;
   let signatureBytes;
   try {
-    rawPublicKey = decodeBase64Url(signature.public_key);
-    signatureBytes = decodeBase64Url(signature.sig);
+    rawPublicKey = fromBase64Url(signature.public_key);
+    signatureBytes = fromBase64Url(signature.sig);
   } catch (error) {
     record(state, 'signature.key_id', 'fail',
       `public_key or sig is not valid base64url: ${error.message}`);
     return;
   }
 
-  const computedKeyId = keyId(rawPublicKey);
+  const computedKeyId = await runtime.keyId(rawPublicKey);
   if (computedKeyId !== signature.key_id) {
     record(state, 'signature.key_id', 'fail',
       `key_id is ${signature.key_id}, and the public key hashes to ${computedKeyId}`);
@@ -692,7 +709,7 @@ function verifySignature(state, options) {
       `no signing prefix is defined for specification version ${manifest.spec_version}`);
     return;
   }
-  const ok = verifyMessage(message, signatureBytes, rawPublicKey);
+  const ok = await runtime.verifySignature(message, signatureBytes, rawPublicKey);
   record(state, 'signature.verify', ok ? 'pass' : 'fail',
     ok ? undefined : 'the signature does not verify against the public key it names');
 

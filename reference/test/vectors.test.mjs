@@ -21,7 +21,7 @@ import { sha256 } from '../src/digest.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const vectorsPath = join(root, 'spec', 'vectors', 'receipt-vectors.json');
 const committed = JSON.parse(readFileSync(vectorsPath, 'utf8'));
-const { document, fixtures, problems } = buildVectors();
+const { document, fixtures, problems } = await buildVectors();
 
 test('every case still matches the expectation written down in cases.mjs', () => {
   assert.deepEqual(problems, []);

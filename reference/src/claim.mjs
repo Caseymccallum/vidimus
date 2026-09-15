@@ -35,6 +35,9 @@ import { writeZip } from './zip-write.mjs';
  */
 export const SPEC_VERSION = '0.1.0';
 
+/** The only signature algorithm this version of the format defines. */
+export const ED25519_ALG = 'ed25519';
+
 /** The domain-separation prefix for signature messages, per major specification version. */
 const SIGNING_PREFIX_BY_MAJOR = new Map([[0, 'vidimus/claim/']]);
 
