@@ -17,11 +17,10 @@
  * @module seal
  */
 
-import { canonicalise } from './canonical.mjs';
 import { sha256, utf8, toBase64Url } from './digest.mjs';
-import { readZip, writeZip } from './zip.mjs';
+import { readZip } from './zip.mjs';
 import { findMainDocument } from './warc.mjs';
-import { signedSubtree, signingMessage, SPEC_VERSION } from './verify.mjs';
+import { ED25519_ALG, draftClaim, finishClaim } from './claim.mjs';
 import { rawPublicKey, keyId, signMessage } from './signature.mjs';
 
 /** Thrown when the capture cannot be sealed honestly. */
@@ -158,58 +157,42 @@ export function sealFromCapture(input) {
     );
   }
 
-  const manifest = {
-    spec_version: SPEC_VERSION,
-    canonical_form: 'canonical-json-v1',
-    capture: {
-      path: 'capture.wacz',
-      media_type: 'application/wacz',
-      sha256: sha256(capture),
-      bytes: capture.length,
-      captured_at: capturedAt,
-    },
-    subject: {
-      url,
-      // `final_url` and the two optional response facts are only present when the capture answered
-      // them: an absent field is a fact about what is known, where a guessed one is a lie.
-      ...(fromCapture !== null && fromCapture.url !== null && fromCapture.url !== url
-        ? { final_url: fromCapture.url }
-        : {}),
-      ...(fromCapture !== null ? { status: fromCapture.status } : {}),
-      ...(fromCapture !== null && fromCapture.contentType !== null
-        ? { content_type: fromCapture.contentType }
-        : {}),
-      document: { sha256: sha256(body), bytes: body.length },
-    },
-    tool: { name: 'vidimus', version: SPEC_VERSION },
-    signature: null,
+  // The claim is built by `claim.mjs`, which is the module the browser producer uses too: one definition
+  // of what a claim contains, so the two producers cannot drift apart (D-020).
+  const draft = draftClaim({
+    capture,
+    url,
+    finalUrl: fromCapture === null ? null : fromCapture.url,
+    status: fromCapture === null ? null : fromCapture.status,
+    contentType: fromCapture === null ? null : fromCapture.contentType,
+    capturedAt,
+    document: { sha256: sha256(body), bytes: body.length },
+    captureProfile: input.captureProfile ?? null,
     anchor: input.anchor ?? { type: 'none' },
-  };
+  });
 
-  const claimHash = sha256(canonicalise(signedSubtree(manifest)));
-
+  let signature = null;
   if (input.key !== undefined && input.key !== null) {
     const { privateKey } = input.key;
     const publicKey = rawPublicKey(privateKey);
     /** @type {Record<string, any>} */
-    const signature = {
-      alg: 'ed25519',
+    const made = {
+      alg: ED25519_ALG,
       key_id: keyId(publicKey),
       public_key: toBase64Url(publicKey),
-      sig: toBase64Url(signMessage(signingMessage(SPEC_VERSION, claimHash), privateKey)),
+      sig: toBase64Url(signMessage(draft.message, privateKey)),
     };
     if (typeof input.key.signer === 'string' && input.key.signer !== '') {
-      signature.signer = input.key.signer;
+      made.signer = input.key.signer;
     }
-    manifest.signature = signature;
+    signature = made;
   }
 
-  // The container's own entry timestamps come from the claim, so sealing the same capture twice
-  // produces the same bytes - which is what lets a test assert the round trip rather than describe it.
-  const bytes = writeZip(
-    [['receipt.json', utf8(canonicalise(manifest))], ['capture.wacz', capture]],
-    { date: new Date(capturedAt) },
-  );
-
-  return { bytes, manifest, claimHash, warnings };
+  const finished = finishClaim(draft, signature);
+  return {
+    bytes: finished.bytes,
+    manifest: finished.manifest,
+    claimHash: finished.claimHash,
+    warnings,
+  };
 }

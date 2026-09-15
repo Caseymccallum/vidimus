@@ -349,6 +349,31 @@ browser. The first is a security decision - verification code that silently acce
 be the worst possible bug in this project - and the second is the duplication this repository exists to
 avoid.
 
+### D-022 - A receipt says what kind of capture it holds, and stays silent when it cannot
+
+`capture.profile` is an optional field naming the kind of capture: `document-v1` for a document as a
+browser rendered it. The browser shell writes it, because it knows what it made. `vidimus seal` writes it
+only when asked (`--profile`), because it seals captures other tools made and has no way to know what is
+inside one. The fixtures leave it out, because a synthetic capture has no kind to declare.
+
+**It is not a check, and the reason is a rule the level system imposes on every check.** A level is
+`pass` only when every check in it is `pass`, so a check that *cannot apply* to some receipts would make
+that level unverifiable for them. A profile check cannot apply to a claim that declares no profile -
+which is every receipt written before this field existed, and every receipt from a tool that does not set
+it. Adding it to L0 would have turned all of them into receipts whose integrity could not be verified,
+which is absurd; and reporting absence as `pass` would be an unearned tick.
+
+So the verdict reports it instead: `capture.profile` and `capture.profile_known`, with a caveat when the
+profile is one this verifier does not interpret. The bytes are checked, and the *meaning* of the capture
+is declared and named as such. Two rules worth keeping fall out of that, and they are in the
+specification (section 4.4.1) where an implementer will meet them:
+
+1. a check must always apply to a receipt that reaches its level;
+2. a fact a verifier cannot check is reported, and named as uncontrolled, rather than judged.
+
+**Rejected:** a check (above), and a *required* field - which would invalidate every receipt already
+written and would force a sealer of foreign captures to guess at something it cannot see.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

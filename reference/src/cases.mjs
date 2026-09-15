@@ -672,4 +672,37 @@ export const CASES = [
       },
     },
   },
+  {
+    id: 'capture-profile-declared',
+    description: 'a capture that says what kind of capture it is',
+    proves: 'the profile is reported rather than judged: verification is unchanged, and a reader is told which kind of capture they are holding',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        manifest.capture.profile = 'document-v1';
+      },
+    }).bytes,
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: {},
+    },
+  },
+  {
+    id: 'capture-profile-unrecognised',
+    description: 'a capture whose declared kind this verifier does not interpret',
+    proves: 'an unknown profile is neither a pass nor a failure: the bytes are checked, the meaning is caveated, and the receipt stays verified on integrity and attribution',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        manifest.capture.profile = 'wire-v1';
+      },
+    }).bytes,
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: {},
+      caveats: 2,
+    },
+  },
 ];

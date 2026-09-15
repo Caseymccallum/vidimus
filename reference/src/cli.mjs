@@ -37,8 +37,8 @@ const USAGE = [
   'usage: vidimus verify  <file.receipt> [--json] [--trusted-key <hex>]... [--previous <hex>]',
   '       vidimus inspect <file.receipt>',
   '       vidimus seal    <capture.wacz> [--url <url>] [--captured-at <ts>] [--document <file>]',
-  '                       [--key <key.json> | --unsigned] [--chain <n> --prev <hash>]',
-  '                       [--out <file.receipt>] [--force] [--json]',
+  '                       [--profile <name>] [--key <key.json> | --unsigned]',
+  '                       [--chain <n> --prev <hash>] [--out <file.receipt>] [--force] [--json]',
   '       vidimus keygen  [--out <key.json>] [--signer <name>] [--force]',
 ];
 
@@ -137,7 +137,7 @@ function parseSeal(rest) {
       parsed.force = true;
     } else if (argument === '--unsigned') {
       parsed.unsigned = true;
-    } else if (['--url', '--captured-at', '--document', '--key', '--out', '--prev'].includes(argument)) {
+    } else if (['--url', '--captured-at', '--document', '--key', '--out', '--prev', '--profile'].includes(argument)) {
       const value = nextValue(rest, index, argument);
       if (value === null) return null;
       parsed[flagName(argument)] = value;
@@ -401,6 +401,9 @@ async function sealCapture(options) {
       url: options.url ?? null,
       document,
       capturedAt: options.capturedAt ?? null,
+      // Declared only when the caller says so: this command seals captures other tools made, and it has
+      // no way to know what is inside one (section 4.4 of the specification).
+      captureProfile: options.profile ?? null,
       anchor,
       key,
     });

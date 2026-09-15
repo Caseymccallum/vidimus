@@ -89,6 +89,10 @@ function record(verdict) {
     // worked examples. A test compares those examples against this field, so a transcript in a
     // document cannot quietly go stale.
     claim_hash: verdict.receipt.claim_hash,
+    // Recorded as well as printed, because what kind of capture a receipt holds is the one thing a
+    // reader cannot work out from the bytes: if a regression stopped reporting it, nothing else would
+    // notice (specification section 4.4).
+    capture_profile: verdict.capture.profile,
     levels: Object.fromEntries(LEVELS.map((level) => [level.id, verdict.levels[level.id].status])),
     attribution: {
       status: verdict.attribution.status,

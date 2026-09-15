@@ -26,9 +26,11 @@ the two producers cannot drift apart (D-018).
   asynchronous and this reader is not. Every receipt this project writes is stored uncompressed, so the
   limit costs nothing for its own output; another tool's container may need the command line, and the
   check reports `unsupported` rather than pretending.
-- **It captures the document as rendered**, not the stylesheets and images around it. Nothing in the claim
-  yet *says* which kind of capture it is - see section 13 of the specification, where a `capture.profile`
-  field is proposed.
+- **It says what kind of capture it holds.** Its claims declare `capture.profile: "document-v1"` - the
+  document as the browser rendered it. That is a different claim from one holding the bytes a server
+  sent, and a reader deciding whether a receipt is good enough now has a way to tell the two apart.
+- **It does not capture the stylesheets and images** around the document. The capture is the document
+  itself, and the profile above is where that is written down.
 - **It asks for `<all_urls>`.** That host permission is what makes a response status observable; without
   it the claim would carry no `status` and no `content_type` (both optional in the format). A real trade,
   and the first one to revisit.

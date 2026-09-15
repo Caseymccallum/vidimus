@@ -68,6 +68,7 @@ export async function sealPage(input) {
     contentType: facts.contentType ?? null,
     capturedAt: facts.capturedAt,
     document: capture.document,
+    captureProfile: capture.profile,
     anchor: input.anchor,
   });
 

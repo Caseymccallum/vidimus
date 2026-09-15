@@ -137,6 +137,7 @@ having.
 | `canonical_form` | string | yes | `"canonical-json-v1"`. A named form, so a future change is visible rather than silent. |
 | `capture.path` | string | yes | Entry name of the capture inside the container. |
 | `capture.media_type` | string | yes | `"application/wacz"` in 0.1. |
+| `capture.profile` | string | no | What *kind* of capture this is. Absent means the producer is not saying. See section 4.4. |
 | `capture.sha256` | hex string | yes | SHA-256 of the capture's bytes, exactly as stored. |
 | `capture.bytes` | integer | yes | Length of the capture. Redundant with the digest on purpose: a claim that is wrong about its own size should say so precisely, not as "digest mismatch". |
 | `capture.captured_at` | UTC timestamp | yes | When the capture was taken, **as claimed**. Whether it is attested is a separate level (section 8). |
@@ -190,6 +191,46 @@ anchor, so nothing to check"), and the difference between "the author did not an
 and "this receipt does not say" is worth a required field. It is also signed, because an
 anchor that could have existed at signing time is inside the signed subtree (section 6.1) -
 which matters more than it sounds: see D-011.
+
+## 4.4 `capture.profile`: what kind of capture is it
+
+A capture can hold very different things and still be a valid WACZ. Two of them look identical to a
+verifier that only counts bytes:
+
+- **`document-v1`** — the main document as a browser rendered it, with the transport headers that
+  describe a wire representation removed (`Content-Length`, `Content-Encoding`,
+  `Transfer-Encoding`). This is what a Manifest V3 extension can honestly capture, because it cannot
+  read the body of a response the page made.
+- **the bytes the server sent** — a WARC response record whose payload is what came over the wire,
+  which is what crawling tools produce.
+
+Those are not the same claim. "Here is what the page said to me, as it rendered" and "here is what the
+server sent" differ whenever a page is assembled by scripts, and a reader deciding whether a receipt is
+good enough for their purpose needs to know which one they are holding.
+
+So `capture.profile` names it. The field is **optional**, and absence is a fact rather than a defect:
+it means the producer is not saying, which is the honest position for a tool that captured a WACZ
+somebody else wrote.
+
+A verifier **MUST** report the declared profile in its verdict, along with whether it understands it,
+and **MUST** raise a caveat when the profile is one it does not interpret. It **MUST NOT** treat an
+unrecognised profile as a pass *or* as a failure: the bytes are checkable and the *meaning* of the
+capture is not, and those are different statements.
+
+### 4.4.1 Why this is not a check
+
+It was proposed as one, and the proposal does not survive the level rules of section 7.3. A level is
+`pass` only when every check in it is `pass`, so a check that *cannot apply* to a receipt - and a
+profile check cannot apply to a claim that declares no profile - would make that level unverifiable for
+every receipt that omits the optional field. Adding it to L0 in 0.1.0 would have turned every receipt
+written without a profile into one whose integrity could not be verified, which is absurd.
+
+Two rules fall out of that, and they are worth stating because they constrain what a check can ever be:
+
+1. **A check must always apply to a receipt that reaches its level.** If a fact is optional, its
+   absence is reported as a caveat or a declared field, not as a check.
+2. **A field whose meaning a verifier cannot check is reported, and named as uncontrolled.** That is
+   what the verdict's `capture` block is for - it is information for a reader, not evidence of anything.
 
 ## 5. Canonical form: `canonical-json-v1`
 
@@ -630,8 +671,6 @@ Written down now, with the reason each is deferred:
 7. **Attaching a receipt to the thing it supports**: a PDF (in the shape PAdES uses), a citation
    manager entry, a git commit. This is where the format meets its users, and it is out of scope
    only because 0.1 has to be checkable first.
-8. **A `capture.profile` field**, naming what kind of capture a receipt holds - `document-v1` for a
-   document as a browser rendered it, and whatever a richer capture calls itself later. It wants a check
-   of its own (an unrecognised profile should leave a receipt unverified, as an unrecognised capture
-   type does), which is why it is not being smuggled in now as an unverified field: a claim that
-   describes itself and is not checked is worse than a claim that does not describe itself at all.
+8. **Filling in the profiles.** `document-v1` is defined and produced (section 4.4); a *wire* profile
+   needs a name and something that can write one, which means a crawler rather than a browser extension.
+   Naming it before anything can produce it would be a name with no meaning.

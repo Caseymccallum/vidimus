@@ -79,6 +79,15 @@ export const CHECKS = [
   { id: 'subject.text', level: 'L3', description: 'the text fingerprint matches its definition' },
 ];
 
+/**
+ * The capture profiles this verifier interprets.
+ *
+ * An unrecognised one is reported and caveated, never judged: the bytes of a capture are checkable
+ * whatever it holds, and what it holds is not something a verifier can work out for itself. See section
+ * 4.4 of the specification, which also explains why this is not a check.
+ */
+export const KNOWN_CAPTURE_PROFILES = new Set(['document-v1']);
+
 /** Levels, in order, with what each one is allowed to mean. */
 export const LEVELS = [
   { id: 'L0', name: 'integrity', claim: 'these are the bytes this receipt names' },
@@ -114,6 +123,7 @@ function isObject(value) {
  * @returns {{
  *   verifier: { name: string, version: string },
  *   receipt: { spec_version: string | null, claim_hash: string | null, entries: string[] },
+ *   capture: { profile: string | null, profile_known: boolean | null },
  *   verified: boolean,
  *   exit_code: 0 | 1 | 2,
  *   levels: Record<string, { status: string, name: string, claim: string }>,
@@ -179,6 +189,14 @@ export async function verifyReceipt(bytes, options = {}) {
     if (typeof manifest.subject?.url === 'string' && manifest.subject.url.startsWith('http:')) {
       state.caveats.push('the page was served over plain HTTP, so this records what a network could alter');
     }
+
+    const declaredProfile = manifest.capture?.profile;
+    if (typeof declaredProfile === 'string' && !KNOWN_CAPTURE_PROFILES.has(declaredProfile)) {
+      state.caveats.push(
+        `the capture declares profile "${declaredProfile}", which this verifier does not interpret: `
+        + 'the bytes are checked, and what kind of capture this is, is not',
+      );
+    }
   }
 
   const statuses = Object.fromEntries(LEVELS.map((level) => [level.id, rollUpLevel(state, level.id)]));
@@ -194,6 +212,14 @@ export async function verifyReceipt(bytes, options = {}) {
       spec_version: typeof manifest?.spec_version === 'string' ? manifest.spec_version : null,
       claim_hash: state.claimHash,
       entries: state.entryNames.slice(),
+    },
+    capture: {
+      // Reported, never judged. What kind of capture this is cannot be worked out from its bytes, so a
+      // reader is told what the claim says and whether this verifier interprets it (specification 4.4).
+      profile: typeof manifest?.capture?.profile === 'string' ? manifest.capture.profile : null,
+      profile_known: typeof manifest?.capture?.profile === 'string'
+        ? KNOWN_CAPTURE_PROFILES.has(manifest.capture.profile)
+        : null,
     },
     verified,
     exit_code: anyFail ? 2 : (verified ? 0 : 1),

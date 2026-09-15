@@ -233,5 +233,9 @@ export function buildCapture(input) {
     wacz,
     record,
     document: { sha256: toHex(sha256(html)), bytes: html.length },
+    // What this module makes, named: a document as the browser rendered it. A claim that carries this
+    // can be told apart from one that holds the bytes a server sent, which is the difference a reader
+    // deciding whether to rely on it actually needs (section 4.4 of the specification).
+    profile: 'document-v1',
   };
 }

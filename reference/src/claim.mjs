@@ -132,6 +132,11 @@ export function draftClaim(input) {
     capture: {
       path: 'capture.wacz',
       media_type: 'application/wacz',
+      // Present only when the producer knows what it captured. A tool sealing a WACZ somebody else wrote
+      // has no business guessing, and absence is the honest answer (section 4.4 of the specification).
+      ...(typeof input.captureProfile === 'string' && input.captureProfile !== ''
+        ? { profile: input.captureProfile }
+        : {}),
       sha256: toHex(sha256(input.capture)),
       bytes: input.capture.length,
       captured_at: input.capturedAt,

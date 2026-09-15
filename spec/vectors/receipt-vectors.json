@@ -139,6 +139,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -189,6 +190,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -236,6 +238,7 @@
         "verified": false,
         "exit_code": 1,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "not_applicable",
@@ -290,6 +293,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -334,6 +338,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "0a35e4b11433eb6356366a712a26fbe94896297a74f80eba69afbf0600aa9a07",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -380,6 +385,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "9f52ada2d2cd3217ce1dda8cec3926a4874c08a00da0ab856f9d2123286822a6",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -427,6 +433,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "66af5c1390cd06326d435b237c1f1f64bfc8dca2471498ea89b210efa3a2cb21",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -477,6 +484,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -526,6 +534,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "bcc37fec072bdb1da22496c0162cbe4cf0871a399adb5d1808fb857d218dc1e4",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -576,6 +585,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "1d749a4f6b37684d223324f972934a4537d3973118e5d45aff0243182e757036",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "fail",
@@ -626,6 +636,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -675,6 +686,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": null,
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "not_applicable",
@@ -736,6 +748,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": null,
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "not_checked",
@@ -801,6 +814,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -854,6 +868,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "68cc38fbfeda566c9a1d8852c2dc87bd256f8193db23267e2e253e35dd7b335d",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -909,6 +924,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": null,
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "not_checked",
@@ -967,6 +983,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "fail",
@@ -1015,6 +1032,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "fail",
@@ -1065,6 +1083,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "50e095d8475b049b203a6dd8322ee1926c9d5d6f9cb5ef66d0e47f4d5623ba2e",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1111,6 +1130,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "9b79e33454c6e440a93c6d639fd580385a75bb162dd95b1a8ec51ed9075201b0",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1157,6 +1177,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "9b79e33454c6e440a93c6d639fd580385a75bb162dd95b1a8ec51ed9075201b0",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1202,6 +1223,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "9b79e33454c6e440a93c6d639fd580385a75bb162dd95b1a8ec51ed9075201b0",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1247,6 +1269,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "dc4e4ad89e68a10bd501859a584515b44cfe019496817f5631717ce392e6a9e2",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1293,6 +1316,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1339,6 +1363,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "58156bc24689df4e883d2c35a91961244d206a66fabdcad085d28e17662ce970",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1383,6 +1408,7 @@
         "verified": true,
         "exit_code": 0,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
@@ -1429,6 +1455,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": null,
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "not_checked",
@@ -1491,6 +1518,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": null,
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "not_checked",
@@ -1554,6 +1582,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "040f9c9150d9d7ac746da62779209e4fb89019ea290c765e0d1fc1fe79dcd508",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -1602,6 +1631,7 @@
         "verified": false,
         "exit_code": 1,
         "claim_hash": "2d554c2ad0613b3ac3e63b4273f7de129f811eff35790e8aae904268ad00ff35",
+        "capture_profile": null,
         "levels": {
           "L0": "unsupported",
           "L1": "pass",
@@ -1653,6 +1683,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "daa6325bd7b209c6efba66b58a8180ecf51203d4ca5281bd973b65565c96d32b",
+        "capture_profile": null,
         "levels": {
           "L0": "fail",
           "L1": "pass",
@@ -1702,6 +1733,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "fail",
@@ -1751,6 +1783,7 @@
         "verified": false,
         "exit_code": 1,
         "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "unsupported",
@@ -1803,6 +1836,7 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "50e095d8475b049b203a6dd8322ee1926c9d5d6f9cb5ef66d0e47f4d5623ba2e",
+        "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "fail",
@@ -1817,6 +1851,97 @@
         "caveat_count": 0,
         "checks": {
           "signature.verify": "fail",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-profile-declared",
+      "description": "a capture that says what kind of capture it is",
+      "proves": "the profile is reported rather than judged: verification is unchanged, and a reader is told which kind of capture they are holding",
+      "fixture": {
+        "file": "capture-profile-declared.receipt",
+        "sha256": "b7fee3c27234567034ac1ac2676f81e5f6c9d15ffc2507d8c6bfe1eb028c6151",
+        "bytes": 2247
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {}
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "40db7a584deaa948d908ca41bf4267bd2c976137d552a1c1b0579b375289a3fb",
+        "capture_profile": "document-v1",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-profile-unrecognised",
+      "description": "a capture whose declared kind this verifier does not interpret",
+      "proves": "an unknown profile is neither a pass nor a failure: the bytes are checked, the meaning is caveated, and the receipt stays verified on integrity and attribution",
+      "fixture": {
+        "file": "capture-profile-unrecognised.receipt",
+        "sha256": "b53d38cda725765b1fe9f4ac32bda303117249aedc95dd1a5952b42225f2963a",
+        "bytes": 2243
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {},
+        "caveats": 2
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "440e15315a4058b9c29815d977a7160f2d6f443907a3ddf065f4499b94d80dd6",
+        "capture_profile": "wire-v1",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
         }
