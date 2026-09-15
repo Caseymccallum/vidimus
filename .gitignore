@@ -1,0 +1,13 @@
+# The fixtures are generated from a recipe, never edited by hand, and never committed:
+# `spec/vectors/*.json` is the record, `spec/fixtures/` is what you rebuild when you want it.
+spec/fixtures/
+
+# Nothing else here should ever be needed, but these are the local conveniences that
+# would otherwise end up in a diff: editor state, package manager noise, OS litter.
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json

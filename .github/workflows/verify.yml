@@ -1,0 +1,33 @@
+name: verify
+
+# The gate, run on every push and every pull request.
+#
+# It is deliberately the same command a person runs: `npm run verify`. There is no separate CI
+# configuration that could drift from the local one, and no install step beyond the runner's own
+# Node, because the project has no dependencies (`docs/ARCHITECTURE.md`, D-002).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is in the matrix on purpose. The verifier confines entry names to the archive
+        # precisely because `path.join` behaves differently here, and the fixture builder pins its
+        # gzip header so a recorded digest does not depend on the platform that produced it
+        # (D-010). Both of those claims are only worth anything if a Windows runner disagrees
+        # loudly when they stop being true.
+        os: [ubuntu-latest, windows-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Verify
+        run: npm run verify

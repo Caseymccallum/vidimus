@@ -1,0 +1,31 @@
+{
+  "name": "vidimus",
+  "displayName": "Vidimus",
+  "description": "An authenticated copy of a web page: proof of what it said, verifiable by anyone.",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "Casey McCallum",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Caseymccallum/vidimus.git"
+  },
+  "bin": {
+    "vidimus": "./reference/src/cli.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "syntax": "node scripts/check-syntax.mjs",
+    "check:language": "node scripts/check-language.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "vidimus": "node reference/src/cli.mjs",
+    "vectors:generate": "node reference/src/vectors.mjs --write",
+    "vectors:check": "node reference/src/vectors.mjs --check",
+    "verify": "npm run syntax && npm run check:language && npm test && npm run check:docs && npm run vectors:check"
+  }
+}

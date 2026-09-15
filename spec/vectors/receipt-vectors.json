@@ -1,0 +1,1826 @@
+{
+  "spec_version": "0.1.0",
+  "verifier_version": "0.1.0",
+  "generations": [
+    "node reference/src/vectors.mjs --write",
+    "node reference/src/vectors.mjs --check   # what CI runs"
+  ],
+  "checks": [
+    {
+      "id": "container.readable",
+      "level": "L0",
+      "description": "the file is a ZIP that reads"
+    },
+    {
+      "id": "manifest.present",
+      "level": "L0",
+      "description": "receipt.json is present"
+    },
+    {
+      "id": "manifest.parseable",
+      "level": "L0",
+      "description": "receipt.json is valid JSON"
+    },
+    {
+      "id": "manifest.spec_version",
+      "level": "L0",
+      "description": "spec_version is understood"
+    },
+    {
+      "id": "manifest.canonical",
+      "level": "L0",
+      "description": "receipt.json is in canonical form"
+    },
+    {
+      "id": "manifest.shape",
+      "level": "L0",
+      "description": "required fields are present and typed"
+    },
+    {
+      "id": "claim.digest",
+      "level": "L0",
+      "description": "the signed subtree digests deterministically"
+    },
+    {
+      "id": "capture.present",
+      "level": "L0",
+      "description": "the capture named by the receipt exists"
+    },
+    {
+      "id": "capture.bytes",
+      "level": "L0",
+      "description": "the capture is the declared length"
+    },
+    {
+      "id": "capture.digest",
+      "level": "L0",
+      "description": "the capture hashes to the declared digest"
+    },
+    {
+      "id": "capture.media_type",
+      "level": "L0",
+      "description": "the capture is a container this verifier reads"
+    },
+    {
+      "id": "capture.wacz.readable",
+      "level": "L0",
+      "description": "the capture is a readable WACZ"
+    },
+    {
+      "id": "capture.wacz.resources",
+      "level": "L0",
+      "description": "every WACZ resource matches its hash"
+    },
+    {
+      "id": "signature.present",
+      "level": "L1",
+      "description": "the claim carries a signature"
+    },
+    {
+      "id": "signature.alg",
+      "level": "L1",
+      "description": "the signature algorithm is supported"
+    },
+    {
+      "id": "signature.key_id",
+      "level": "L1",
+      "description": "key_id is the digest of public_key"
+    },
+    {
+      "id": "signature.verify",
+      "level": "L1",
+      "description": "the signature verifies"
+    },
+    {
+      "id": "anchor.present",
+      "level": "L2",
+      "description": "the claim carries a time anchor"
+    },
+    {
+      "id": "anchor.verified",
+      "level": "L2",
+      "description": "the time anchor verifies"
+    },
+    {
+      "id": "subject.text",
+      "level": "L3",
+      "description": "the text fingerprint matches its definition"
+    }
+  ],
+  "vectors": [
+    {
+      "id": "valid-signed",
+      "description": "a signed receipt for one page, with no anchor",
+      "proves": "the happy path verifies integrity and attribution, and reports time and currency as unchecked rather than as passes",
+      "fixture": {
+        "file": "valid-signed.receipt",
+        "sha256": "b7698972b944aab5cc24ba9b75407258caff301b9b12e9d4b584cf4d663c3eaa",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "container.readable": "pass",
+          "capture.wacz.resources": "pass",
+          "signature.verify": "pass",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "valid-signed-trusted",
+      "description": "the same receipt, checked against a key list that contains the signer",
+      "proves": "key trust is reported separately: L1 says the signature is valid, and only a caller-supplied key list can say the key is one you meant to trust",
+      "fixture": {
+        "file": "valid-signed-trusted.receipt",
+        "sha256": "b7698972b944aab5cc24ba9b75407258caff301b9b12e9d4b584cf4d663c3eaa",
+        "bytes": 2223
+      },
+      "options": {
+        "trustedKeys": [
+          "94161df698f36a91d38e29a8e59314f35a0639163f4e745d607410da5e420489"
+        ]
+      },
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.verify": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "trusted"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "valid-unsigned",
+      "description": "a receipt whose claim carries no signature",
+      "proves": "an unsigned receipt is not reported as a failure and not reported as verified: attribution is not_applicable, and the exit code distinguishes it from a broken receipt",
+      "fixture": {
+        "file": "valid-unsigned.receipt",
+        "sha256": "a4be32ac7b8bdde4665ca5e5e98f4c38c487f947cd9d1da194c46914a93f83c6",
+        "bytes": 1932
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "pass",
+          "L1": "not_applicable",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.present": "not_applicable",
+          "signature.verify": "not_applicable"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "not_applicable",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "signature.present": "not_applicable",
+          "signature.alg": "not_applicable",
+          "signature.key_id": "not_applicable",
+          "signature.verify": "not_applicable",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "valid-signed-trusted-wrong",
+      "description": "a valid signature from a key the caller does not list",
+      "proves": "an untrusted key does not make a receipt invalid, and does not make it trusted either",
+      "fixture": {
+        "file": "valid-signed-trusted-wrong.receipt",
+        "sha256": "b7698972b944aab5cc24ba9b75407258caff301b9b12e9d4b584cf4d663c3eaa",
+        "bytes": 2223
+      },
+      "options": {
+        "trustedKeys": [
+          "0759535e9aaff2fa3e891346b06c4bde18de39c468913fdf3b65ab6895df8f7a"
+        ]
+      },
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.verify": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "untrusted"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "valid-http-page",
+      "description": "a capture of a page served over plain HTTP",
+      "proves": "an insecure page is still worth recording, so it verifies and is caveated rather than failed",
+      "fixture": {
+        "file": "valid-http-page.receipt",
+        "sha256": "9f35c7ab5f85ad3211fef8775486f72720e12adddcbb2819aa41b19ef640379c",
+        "bytes": 2163
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {}
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "0a35e4b11433eb6356366a712a26fbe94896297a74f80eba69afbf0600aa9a07",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "valid-with-text",
+      "description": "a receipt that declares a text fingerprint",
+      "proves": "this verifier says it did not check the fingerprint instead of implying it did",
+      "fixture": {
+        "file": "valid-with-text.receipt",
+        "sha256": "6ce8deea4f27755368433692ceb6fb1152f00102c275fd344598678d7b75dd0c",
+        "bytes": 2334
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "checks": {
+          "subject.text": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "9f52ada2d2cd3217ce1dda8cec3926a4874c08a00da0ab856f9d2123286822a6",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "valid-signed-with-notes",
+      "description": "a receipt carrying an extra field the spec does not define",
+      "proves": "an unknown top-level field is inside the signed subtree: it cannot be added, removed or edited without the signature failing",
+      "fixture": {
+        "file": "valid-signed-with-notes.receipt",
+        "sha256": "108e1172edc70ccde611b3d3c2c44a7c525e4710dfb76af6fe514311021c618e",
+        "bytes": 2297
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "claim.digest": "pass",
+          "signature.verify": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "66af5c1390cd06326d435b237c1f1f64bfc8dca2471498ea89b210efa3a2cb21",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-digest-mismatch",
+      "description": "the capture swapped for a different one of exactly the same length",
+      "proves": "the digest check does work nothing else does: the length matches, the replacement capture is internally consistent, and only capture.digest notices",
+      "fixture": {
+        "file": "capture-digest-mismatch.receipt",
+        "sha256": "a51c7b35f555fb1a09dce9c7c077606443bc177779555e03ecd47180a2e5b560",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "capture.bytes": "pass",
+          "capture.digest": "fail",
+          "capture.wacz.readable": "pass",
+          "capture.wacz.resources": "pass",
+          "signature.verify": "pass"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "capture.digest": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-resource-mismatch",
+      "description": "a WACZ whose record does not match the hash its own datapackage advertises",
+      "proves": "the inner resource hashes catch content the outer container digest cannot see, and the receipts binds them because it was signed over exactly these bytes",
+      "fixture": {
+        "file": "capture-resource-mismatch.receipt",
+        "sha256": "4f3fd888bc18e3e6491a3133ada8c83aa9e4a3a0ee09cb8dfa01ed5db8c9c39a",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "capture.digest": "pass",
+          "capture.wacz.readable": "pass",
+          "capture.wacz.resources": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "bcc37fec072bdb1da22496c0162cbe4cf0871a399adb5d1808fb857d218dc1e4",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "capture.wacz.resources": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "claim-edited-after-signing",
+      "description": "the cited URL changed after the receipt was signed",
+      "proves": "the signature covers the claim, not the file: editing a signed field leaves bytes that are canonical and a signature that means nothing",
+      "fixture": {
+        "file": "claim-edited-after-signing.receipt",
+        "sha256": "535ec2d7bf7fe7326d030a33a6102e2a4fdc17ad82f18bf01933e896f455c859",
+        "bytes": 2220
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.canonical": "pass",
+          "claim.digest": "pass",
+          "capture.digest": "pass",
+          "signature.verify": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "1d749a4f6b37684d223324f972934a4537d3973118e5d45aff0243182e757036",
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "invalid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "signature.verify": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "claim-not-canonical",
+      "description": "a receipt serialised with JSON.stringify instead of canonical form",
+      "proves": "the signature still verifies and the receipt is still rejected, because the bytes that were signed are not the bytes that were delivered",
+      "fixture": {
+        "file": "claim-not-canonical.receipt",
+        "sha256": "469cb672f5b1c7eef1821d6e27c1a8c6ae780b4676ac15a3ec8c75c4280f3446",
+        "bytes": 2396
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.parseable": "pass",
+          "manifest.canonical": "fail",
+          "claim.digest": "pass",
+          "signature.verify": "pass"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "manifest.canonical": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "claim-contains-a-float",
+      "description": "a claim with a fractional byte count",
+      "proves": "canonical-json-v1 admits integers only, so a float is a named failure rather than a rounding difference between two implementations",
+      "fixture": {
+        "file": "claim-contains-a-float.receipt",
+        "sha256": "4a8f0b487dc99dfe67b5ff7a78976efdc9406bbbbc4cf23e73403e1611602124",
+        "bytes": 2051
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_applicable",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.canonical": "fail",
+          "claim.digest": "not_checked",
+          "capture.digest": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_applicable",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "manifest.canonical": "fail",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "signature.present": "not_applicable",
+          "signature.alg": "not_applicable",
+          "signature.key_id": "not_applicable",
+          "signature.verify": "not_applicable",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "container-not-a-zip",
+      "description": "a file that is not a receipt at all",
+      "proves": "an unreadable container fails at L0 and every later level says so, instead of reporting nothing and looking clean",
+      "fixture": {
+        "file": "container-not-a-zip.receipt",
+        "sha256": "000d0deeb80488f95be40c53a0ecf39a75f66d610c244cd61892f704489b27bf",
+        "bytes": 39
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "checks": {
+          "container.readable": "fail",
+          "signature.present": "not_checked",
+          "anchor.verified": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "container.readable": "fail",
+          "manifest.present": "not_checked",
+          "manifest.parseable": "not_checked",
+          "manifest.spec_version": "not_checked",
+          "manifest.canonical": "not_checked",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "signature.present": "not_checked",
+          "signature.alg": "not_checked",
+          "signature.key_id": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_checked",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "capture-missing",
+      "description": "a container that holds the claim but not the capture",
+      "proves": "a claim without its bytes verifies nothing: the capture checks are not_checked with a reason, never silently absent",
+      "fixture": {
+        "file": "capture-missing.receipt",
+        "sha256": "7cd69e236c5d5a0b21192c669e70ee359b43aa63d81f6a00b02e7c1fb0205e44",
+        "bytes": 1030
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "capture.present": "fail",
+          "capture.digest": "not_checked",
+          "signature.verify": "pass"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "capture.present": "fail",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-path-escapes",
+      "description": "a claim that points its capture entry outside the container",
+      "proves": "an entry name is untrusted input to a filesystem call, so it is refused at the shape check and never resolved",
+      "fixture": {
+        "file": "capture-path-escapes.receipt",
+        "sha256": "100fda9bbe88d864f9c8eee18e29adc4e81f5472962885b369dac3737a645420",
+        "bytes": 2229
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.shape": "fail",
+          "capture.present": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "68cc38fbfeda566c9a1d8852c2dc87bd256f8193db23267e2e253e35dd7b335d",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "manifest.shape": "fail",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "spec-version-unknown",
+      "description": "a receipt from a future version of the specification",
+      "proves": "a version this verifier does not implement is a failure rather than a soft \"unknown\": nobody can honestly verify a claim they cannot read",
+      "fixture": {
+        "file": "spec-version-unknown.receipt",
+        "sha256": "60851495be01caed9c8c38bdadab0754e955826a18559f182597b760b17d3e0e",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.spec_version": "fail",
+          "manifest.canonical": "not_checked",
+          "signature.verify": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "manifest.spec_version": "fail",
+          "manifest.canonical": "not_checked",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "signature-from-another-claim",
+      "description": "a signature lifted from a different receipt",
+      "proves": "the carried key is well formed, its id matches, the signature is a real Ed25519 signature - and it still fails, because it was made over another claim",
+      "fixture": {
+        "file": "signature-from-another-claim.receipt",
+        "sha256": "c6630a124a9774d797289038680fbbe9e60ec2f903ce166b8ec4b0026c7df350",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.key_id": "pass",
+          "signature.verify": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "invalid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "signature.verify": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "signature-shape-broken",
+      "description": "a signature object with no key in it",
+      "proves": "a malformed signature is a failure, not a gap - reporting \"not checked\" for something that is present and wrong would understate it",
+      "fixture": {
+        "file": "signature-shape-broken.receipt",
+        "sha256": "5d4fb4912dfe89d479d26d375bbdac07f5c8e659c4ce754aa41a156edbc927b0",
+        "bytes": 1945
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.present": "fail",
+          "signature.verify": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "signature.present": "fail",
+          "signature.alg": "not_checked",
+          "signature.key_id": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-chain-head",
+      "description": "the first receipt in a chain",
+      "proves": "a chain head has no link to follow, and saying so is a pass rather than a gap",
+      "fixture": {
+        "file": "anchor-chain-head.receipt",
+        "sha256": "dcd3706638ff9ea9292209e61c2e779936c899cfd9a0d479becc43ea8136b063",
+        "bytes": 2237
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "pass",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "50e095d8475b049b203a6dd8322ee1926c9d5d6f9cb5ef66d0e47f4d5623ba2e",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "pass",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "anchored",
+        "caveat_count": 0,
+        "checks": {
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-chain-linked",
+      "description": "a receipt that links to the previous one in its archive",
+      "proves": "the link is only followed when the neighbour is supplied, and then it is actually compared",
+      "fixture": {
+        "file": "anchor-chain-linked.receipt",
+        "sha256": "a6af83af29f9f0efb6906d10e0dea886a6211b440dab95d785caa5e3ce70996c",
+        "bytes": 2322
+      },
+      "options": {
+        "previousClaimHash": "8fe77eea38fd4cdc634eca4fea775bc1b973678915187bf73285777c1222a438"
+      },
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "pass",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "9b79e33454c6e440a93c6d639fd580385a75bb162dd95b1a8ec51ed9075201b0",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "pass",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "anchored",
+        "caveat_count": 0,
+        "checks": {
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-chain-unlinked",
+      "description": "a receipt whose chain link does not match the neighbour supplied",
+      "proves": "a broken chain link is a failure: the claim is intact and the archive it claims to belong to is not",
+      "fixture": {
+        "file": "anchor-chain-unlinked.receipt",
+        "sha256": "a6af83af29f9f0efb6906d10e0dea886a6211b440dab95d785caa5e3ce70996c",
+        "bytes": 2322
+      },
+      "options": {
+        "previousClaimHash": "0977cd4a614539f9838eb37c993c085409018480b713236c7809106a2841072e"
+      },
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "9b79e33454c6e440a93c6d639fd580385a75bb162dd95b1a8ec51ed9075201b0",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "anchor.verified": "fail",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-chain-unfollowed",
+      "description": "a chain receipt verified without its neighbour",
+      "proves": "an unfollowed link is not_checked, not a pass: the receipt stays verified on integrity and attribution, and the summary says why the ordering is unproven",
+      "fixture": {
+        "file": "anchor-chain-unfollowed.receipt",
+        "sha256": "a6af83af29f9f0efb6906d10e0dea886a6211b440dab95d785caa5e3ce70996c",
+        "bytes": 2322
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "9b79e33454c6e440a93c6d639fd580385a75bb162dd95b1a8ec51ed9075201b0",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-chain-head-with-predecessor",
+      "description": "a chain head that names a predecessor",
+      "proves": "a receipt cannot be both the start of a chain and a link in one",
+      "fixture": {
+        "file": "anchor-chain-head-with-predecessor.receipt",
+        "sha256": "3323d3ab172217fb61e0f7c0a91a5a99ef06c1b42c4193ea18412453c5cf626d",
+        "bytes": 2322
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "dc4e4ad89e68a10bd501859a584515b44cfe019496817f5631717ce392e6a9e2",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "anchor.verified": "fail",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-rfc3161-unimplemented",
+      "description": "a receipt carrying an RFC 3161 timestamp token",
+      "proves": "an anchor this implementation cannot validate is reported unsupported and caveated, and never counts as time established",
+      "fixture": {
+        "file": "anchor-rfc3161-unimplemented.receipt",
+        "sha256": "b64170a01ad355a81f15e247c1dee1290df084786424abd2344ebeef413420e1",
+        "bytes": 2293
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "unsupported",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.present": "pass",
+          "anchor.verified": "unsupported"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "unsupported",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.verified": "unsupported",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-unknown-type",
+      "description": "a receipt with an anchor type that does not exist",
+      "proves": "an unknown anchor is unsupported rather than a failure: this verifier does not know whether it is broken, and says so",
+      "fixture": {
+        "file": "anchor-unknown-type.receipt",
+        "sha256": "d82d12bc79274ff9537c86dc9ce06f35df2908638307e89606af54b07184a7de",
+        "bytes": 2230
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "unsupported",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.present": "unsupported",
+          "anchor.verified": "unsupported"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "58156bc24689df4e883d2c35a91961244d206a66fabdcad085d28e17662ce970",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "unsupported",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "anchor.present": "unsupported",
+          "anchor.verified": "unsupported",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "container-with-stray-entry",
+      "description": "a receipt with an extra file that no rule covers",
+      "proves": "content outside the claim and the capture is reported as a caveat rather than ignored, because nothing signs it",
+      "fixture": {
+        "file": "container-with-stray-entry.receipt",
+        "sha256": "b708e8e0744a7689155ce2a70890e90bcdd89f8ae52c3bf4ab776719ec9bead6",
+        "bytes": 2372
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {}
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "manifest-missing",
+      "description": "a container with a capture but no claim",
+      "proves": "a container without a claim is not a receipt: the missing file is a failure and every later check says it never ran",
+      "fixture": {
+        "file": "manifest-missing.receipt",
+        "sha256": "2068b45d3fabdafc15fa7625bc17c74583e6dea0297fb0fab4eb16411fd03a77",
+        "bytes": 1215
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "checks": {
+          "manifest.present": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "manifest.present": "fail",
+          "manifest.parseable": "not_checked",
+          "manifest.spec_version": "not_checked",
+          "manifest.canonical": "not_checked",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "signature.present": "not_checked",
+          "signature.alg": "not_checked",
+          "signature.key_id": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_checked",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "manifest-not-json",
+      "description": "a receipt.json that is not JSON",
+      "proves": "unparseable bytes are a failure at the container level, not an empty verdict",
+      "fixture": {
+        "file": "manifest-not-json.receipt",
+        "sha256": "2fad916eb126defa11a1000a4c6203225992e6c85cf18a2fea3a80a7359e1efa",
+        "bytes": 152
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "checks": {
+          "manifest.parseable": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "manifest.parseable": "fail",
+          "manifest.spec_version": "not_checked",
+          "manifest.canonical": "not_checked",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "signature.present": "not_checked",
+          "signature.alg": "not_checked",
+          "signature.key_id": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_checked",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "capture-length-wrong",
+      "description": "a claim that understates the size of its own capture",
+      "proves": "the declared length is checked separately from the digest, so a claim that is wrong about its bytes says so precisely",
+      "fixture": {
+        "file": "capture-length-wrong.receipt",
+        "sha256": "2c395bd6380961b90aa62685609b85adb9fea6fc0a516ccbb08198fa2bf06836",
+        "bytes": 2220
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "capture.bytes": "fail",
+          "capture.digest": "pass",
+          "capture.wacz.resources": "pass"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "040f9c9150d9d7ac746da62779209e4fb89019ea290c765e0d1fc1fe79dcd508",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "capture.bytes": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-media-type-unknown",
+      "description": "a claim whose capture is a container this verifier does not read",
+      "proves": "an unreadable kind of capture is unsupported rather than failed, and the receipt is still not verified",
+      "fixture": {
+        "file": "capture-media-type-unknown.receipt",
+        "sha256": "adf8bdc7db811f7eb13aa6de3b4ed4a866d9fc9ef3aacac69dc637cc5bd4142c",
+        "bytes": 2224
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "unsupported",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "capture.media_type": "unsupported",
+          "capture.wacz.readable": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "2d554c2ad0613b3ac3e63b4273f7de129f811eff35790e8aae904268ad00ff35",
+        "levels": {
+          "L0": "unsupported",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "capture.media_type": "unsupported",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-not-a-wacz",
+      "description": "a capture that is not a container at all, correctly hashed",
+      "proves": "the digest being right is not the same as the capture being readable, and the two failures are reported separately",
+      "fixture": {
+        "file": "capture-not-a-wacz.receipt",
+        "sha256": "cf5e3db303b7e3c6d2cc2defd4e38c3cb1cdc30daaa39edcfcdf1e91056d64f6",
+        "bytes": 1168
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "capture.digest": "pass",
+          "capture.wacz.readable": "fail",
+          "capture.wacz.resources": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "daa6325bd7b209c6efba66b58a8180ecf51203d4ca5281bd973b65565c96d32b",
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "capture.wacz.readable": "fail",
+          "capture.wacz.resources": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "signature-key-id-mismatch",
+      "description": "a receipt whose key id does not match the key it carries",
+      "proves": "key ids are derived, not asserted: a mismatch is caught before the signature itself is even examined",
+      "fixture": {
+        "file": "signature-key-id-mismatch.receipt",
+        "sha256": "98b678895046e0b8fc6fbf06a4e3403dca3c3d920cbdbc729abca2e1ca5807db",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.key_id": "fail",
+          "signature.verify": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "signature.key_id": "fail",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "signature-algorithm-unsupported",
+      "description": "a receipt signed with an algorithm this verifier does not implement",
+      "proves": "an unimplemented algorithm leaves the receipt unverified with no failure recorded, which is why the exit codes have three values and not two",
+      "fixture": {
+        "file": "signature-algorithm-unsupported.receipt",
+        "sha256": "e11182bf49a097f8e5783f81068101c0ed1769c07381ac773dae75e6d6a22f28",
+        "bytes": 2233
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "pass",
+          "L1": "unsupported",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "signature.alg": "unsupported",
+          "signature.verify": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a",
+        "levels": {
+          "L0": "pass",
+          "L1": "unsupported",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "signature.alg": "unsupported",
+          "signature.key_id": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-bolted-on",
+      "description": "a chain anchor added to a receipt after it was signed",
+      "proves": "the obvious implementation of \"exclude the anchor from the signature\" would let anyone add one and manufacture an L2 pass; signing every anchor that could have existed at signing time makes it break the signature instead",
+      "fixture": {
+        "file": "anchor-bolted-on.receipt",
+        "sha256": "cb92264cc7e6088a921aa6009a4b2f7726142bce0a9b14353b2ded8d7bae505a",
+        "bytes": 2237
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.canonical": "pass",
+          "signature.verify": "fail",
+          "anchor.present": "pass",
+          "anchor.verified": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "50e095d8475b049b203a6dd8322ee1926c9d5d6f9cb5ef66d0e47f4d5623ba2e",
+        "levels": {
+          "L0": "pass",
+          "L1": "fail",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "invalid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "signature.verify": "fail",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    }
+  ]
+}

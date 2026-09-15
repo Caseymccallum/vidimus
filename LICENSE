@@ -1,0 +1,39 @@
+MIT License
+
+Copyright (c) 2026 Casey McCallum
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Note on scope
+
+The MIT licence above covers the code: everything under `reference/`, `scripts/` and `spec/`.
+
+`docs/RECEIPT-SPEC.md` is a specification rather than a program, and it is offered under
+**Creative Commons Attribution 4.0 International (CC BY 4.0)** so that anyone may implement,
+translate or vend it, including in a product, on the condition that the source is credited.
+
+That split is deliberate, and it is the one thing in this repository that exists to make adoption
+easier rather than to satisfy a licence checklist: a format that cannot be freely reimplemented is
+not a format, it is a product with a file extension. The whole point of a receipt is that a stranger
+can check it, and a stranger cannot check it with software they are not allowed to write.
+
+The published vector digests, the fixture recipes and the decision record are covered by the same
+permission as the specification: they are part of it, not part of the code.
