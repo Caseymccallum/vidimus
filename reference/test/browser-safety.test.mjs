@@ -21,8 +21,18 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sourceOf = (pathFromRoot) => readFileSync(join(root, pathFromRoot), 'utf8');
 
-/** The entry points a browser bundles, as paths from the repository root. */
-const ENTRIES = ['reference/src/capture.mjs', 'extension/lib/sealing.mjs'];
+/**
+ * The entry points a browser bundles, as paths from the repository root.
+ *
+ * `checking.mjs` is here as well as `sealing.mjs`, so the reader, the verifier and the runtime adapter
+ * are all covered by the same walk - which is what makes "the rules are shared with the browser" a
+ * tested statement rather than an intention.
+ */
+const ENTRIES = [
+  'reference/src/capture.mjs',
+  'extension/lib/sealing.mjs',
+  'extension/lib/checking.mjs',
+];
 
 /** Relative imports, which is what a module graph is made of here. */
 /** Relative imports, resolved against the file that made them, because the graph now spans two trees. */
@@ -84,12 +94,15 @@ test('the entry points do not quietly acquire a Node dependency', () => {
   // `capture.mjs` and the extension's `sealing.mjs` are what a browser bundles. If either ever reaches
   // `digest.mjs`, `signature.mjs`, `zip.mjs`, `warc.mjs`, `seal.mjs`, `fixtures.mjs` or `verify.mjs`,
   // the reader/writer split has been undone.
-  const forbidden = ['digest.mjs', 'signature.mjs', 'zip.mjs', 'warc.mjs', 'seal.mjs', 'fixtures.mjs', 'verify.mjs'];
+  const forbidden = ['digest.mjs', 'signature.mjs', 'zip.mjs', 'warc.mjs', 'seal.mjs', 'fixtures.mjs', 'runtime.mjs'];
   for (const entry of ENTRIES) {
     const modules = reachable(entry).map((module) => module.split('/').pop());
     for (const name of forbidden) {
       // Compared by file name, not by suffix: `gzip.mjs` ends with the string `zip.mjs`, and a check
       // that cannot tell those apart fails on the writer it is supposed to be protecting.
+      //
+      // `verify.mjs` is deliberately *not* on this list any more: since the verifier takes a runtime, its
+      // rules import nothing from Node, and the browser imports them directly (D-021).
       assert.ok(
         !modules.includes(name),
         `${entry} now reaches ${name}, which needs Node`,

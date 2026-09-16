@@ -337,9 +337,9 @@ Two consequences worth naming:
 
 1. **A runtime may declare a limit instead of a verdict.** An error carrying `code: 'unsupported'` means
    *this* verifier cannot read *that kind* of container, and the check reports `unsupported` rather than
-   `fail`. The browser's reader is store-only, so a deflated container written by another tool is a gap
-   in the verifier rather than a fault in the receipt - and calling that a failure would be a lie in the
-   safer direction, which is still a lie.
+   `fail`. A browser cannot read ZIP64, a multi-disk archive, an encrypted entry or an unknown
+   compression method - so those are a gap in the verifier rather than a fault in the receipt, and calling
+   them a failure would be a lie in the safer direction, which is still a lie.
 2. **The two runtimes are pinned to each other by a test** that does not merely assert that both pass: it
    asserts that the two verdicts are identical, reason for reason. Two runtimes can agree on an outcome
    and still disagree about why.

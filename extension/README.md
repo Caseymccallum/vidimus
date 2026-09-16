@@ -22,10 +22,9 @@ the two producers cannot drift apart (D-018).
   command line uses (D-021): if what it has just written does not verify, the file is not saved and the
   popup says so. The two runtimes are pinned together by a test that asserts their verdicts are identical,
   reason for reason.
-- **It cannot read a deflated container.** Its reader is store-only, because a browser's decompression is
-  asynchronous and this reader is not. Every receipt this project writes is stored uncompressed, so the
-  limit costs nothing for its own output; another tool's container may need the command line, and the
-  check reports `unsupported` rather than pretending.
+- **It reads containers the way they come**: stored or deflated, so a receipt written by another tool is
+  checked here as well as on the command line. What it cannot read it refuses by name - ZIP64, encrypted
+  entries, an unknown compression method - and the check reports `unsupported` rather than pretending.
 - **It says what kind of capture it holds.** Its claims declare `capture.profile: "document-v1"` - the
   document as the browser rendered it. That is a different claim from one holding the bytes a server
   sent, and a reader deciding whether a receipt is good enough now has a way to tell the two apart.

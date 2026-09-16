@@ -12,11 +12,12 @@ import assert from 'node:assert/strict';
 import { generateKey, keyIdOf } from '../../extension/lib/keys.mjs';
 import { sealPage } from '../../extension/lib/sealing.mjs';
 import { checkReceipt } from '../../extension/lib/checking.mjs';
-import { readStoredZip } from '../../extension/lib/store-zip.mjs';
+import { readZipInBrowser } from '../../extension/lib/browser-zip.mjs';
 import { HOST_PERMISSIONS, PERMISSIONS, REASONS } from '../../extension/permissions.mjs';
 import { verifyReceipt } from '../src/verify-node.mjs';
 import { sha256 } from '../src/digest.mjs';
 import { readZip, writeZip } from '../src/zip.mjs';
+import { crc32 } from '../src/zip-common.mjs';
 import { toHex, utf8 } from '../src/encode.mjs';
 
 /** What a popup can gather: the tab's URL, the observed response, and the rendered document. */
@@ -128,7 +129,7 @@ test('a receipt that has been tampered with fails in the browser too', async () 
   assert.ok(verdict.checks.some((check) => check.status === 'fail'));
 });
 
-test('the store-only reader finds exactly what the command-line reader finds', () => {
+test('the browser reader finds exactly what the command-line reader finds', async () => {
   // Two readers for two runtimes, pinned against each other the way the two SHA-256s are: if they ever
   // disagree about a container, one of them is wrong and this says so.
   const container = writeZip([
@@ -137,7 +138,7 @@ test('the store-only reader finds exactly what the command-line reader finds', (
   ]);
 
   const viaCommandLine = readZip(container);
-  const inBrowser = readStoredZip(container);
+  const inBrowser = await readZipInBrowser(container);
 
   assert.deepEqual(inBrowser.order, viaCommandLine.order);
   for (const [name, contents] of inBrowser.entries) {
@@ -145,17 +146,95 @@ test('the store-only reader finds exactly what the command-line reader finds', (
   }
 });
 
-test('a container this verifier cannot read is unsupported, not failed', async () => {
-  // A receipt whose entry claims to be deflated: perfectly legal ZIP, and beyond a synchronous browser
-  // reader. The distinction matters - `fail` would be accusing the receipt of something.
+test('a deflated container reads in the browser, and agrees with the command line', async () => {
+  // The container another tool would write: compressed, and legal. This is the case the browser could
+  // not read at all before, and the reason the reader is asynchronous.
+  const container = await deflatedZip('receipt.json', utf8('{"compressed":true}'));
+
+  const inBrowser = await readZipInBrowser(container);
+  const viaCommandLine = readZip(container);
+  assert.equal(toHex(inBrowser.entries.get('receipt.json')), toHex(viaCommandLine.entries.get('receipt.json')));
+  assert.equal(toHex(inBrowser.entries.get('receipt.json')), toHex(utf8('{"compressed":true}')));
+});
+
+test('a method this reader does not know is unsupported, not failed', async () => {
+  // A legal ZIP, and beyond this reader: the distinction matters, because `fail` would be accusing the
+  // receipt of something.
   const container = writeZip([['receipt.json', utf8('{"a":1}')]]);
   const view = new DataView(container.buffer, container.byteOffset, container.byteLength);
-  view.setUint16(8, 8, true); // local header: method 8, deflate
-  view.setUint16(view.getUint32(container.length - 22 + 16, true) + 10, 8, true); // central directory
+  view.setUint16(8, 12, true); // local header: method 12, bzip2
+  view.setUint16(view.getUint32(container.length - 22 + 16, true) + 10, 12, true);
 
   const verdict = await checkReceipt(container);
-  const readable = verdict.checks.find((check) => check.id === 'container.readable');
-  assert.equal(readable.status, 'unsupported');
+  assert.equal(verdict.checks.find((check) => check.id === 'container.readable').status, 'unsupported');
   assert.equal(verdict.levels.L0.status, 'unsupported');
   assert.equal(verdict.verified, false);
 });
+
+test('a container that lies about its own method is a failure', async () => {
+  // Says "deflated", holds stored bytes. Now that the browser inflates, this is a genuine failure rather
+  // than an unsupported one: the container is wrong, not merely unfamiliar.
+  const container = writeZip([['receipt.json', utf8('{"a":1}')]]);
+  const view = new DataView(container.buffer, container.byteOffset, container.byteLength);
+  view.setUint16(8, 8, true);
+  view.setUint16(view.getUint32(container.length - 22 + 16, true) + 10, 8, true);
+
+  const verdict = await checkReceipt(container);
+  assert.equal(verdict.checks.find((check) => check.id === 'container.readable').status, 'fail');
+  assert.equal(verdict.verified, false);
+});
+
+/**
+ * A ZIP with one deflated entry, built with the platform's own compressor - the same platform the reader
+ * decompresses with, which is the closest a test can get to another tool's container without owning one.
+ *
+ * @param {string} name
+ * @param {Uint8Array} contents
+ * @returns {Promise<Uint8Array>}
+ */
+async function deflatedZip(name, contents) {
+  const nameBytes = utf8(name);
+  const stream = new Blob([contents]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  const deflated = new Uint8Array(await new Response(stream).arrayBuffer());
+  const crc = crc32(contents);
+
+  const local = new Uint8Array(30 + nameBytes.length + deflated.length);
+  const lv = new DataView(local.buffer);
+  lv.setUint32(0, 0x04034b50, true);
+  lv.setUint16(4, 20, true);
+  lv.setUint16(6, 0x0800, true);
+  lv.setUint16(8, 8, true); // deflate
+  lv.setUint32(14, crc, true);
+  lv.setUint32(18, deflated.length, true);
+  lv.setUint32(22, contents.length, true);
+  lv.setUint16(26, nameBytes.length, true);
+  local.set(nameBytes, 30);
+  local.set(deflated, 30 + nameBytes.length);
+
+  const central = new Uint8Array(46 + nameBytes.length);
+  const cv = new DataView(central.buffer);
+  cv.setUint32(0, 0x02014b50, true);
+  cv.setUint16(4, 20, true);
+  cv.setUint16(6, 20, true);
+  cv.setUint16(8, 0x0800, true);
+  cv.setUint16(10, 8, true);
+  cv.setUint32(16, crc, true);
+  cv.setUint32(20, deflated.length, true);
+  cv.setUint32(24, contents.length, true);
+  cv.setUint16(28, nameBytes.length, true);
+  central.set(nameBytes, 46);
+
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, 1, true);
+  ev.setUint16(10, 1, true);
+  ev.setUint32(12, central.length, true);
+  ev.setUint32(16, local.length, true);
+
+  const out = new Uint8Array(local.length + central.length + eocd.length);
+  out.set(local, 0);
+  out.set(central, local.length);
+  out.set(eocd, local.length + central.length);
+  return out;
+}

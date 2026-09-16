@@ -158,6 +158,9 @@ export function readZip(bytes) {
   const order = [];
 
   for (const header of headers) {
+    if ((header.flags & 0x0001) !== 0) {
+      throw new ZipError(`"${header.name}" is encrypted, which this reader does not support`);
+    }
     if (view.getUint32(header.localOffset, true) !== LOCAL_HEADER) {
       throw new ZipError(`local header for "${header.name}" has a bad signature`);
     }
