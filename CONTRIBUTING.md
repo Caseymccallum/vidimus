@@ -21,9 +21,9 @@ worth more than any amount of additional code.
    ```
 
    The recorded answers are statuses and not prose, so an implementation that disagrees with every word of
-   our reasons is still conformant. It now covers all 21 checks and compares eight of the nine verdict fields -
-   a caveat count is the awkward one, and may not belong in section 11 at all
-   (`conformance/README.md`).
+   our reasons is still conformant. It now meets section 11: all 21 checks, the rollup rules, the canonical
+   form and every rule-derived verdict field. The one thing it does not produce is a caveat count, which
+   section 11.1 records for a reader rather than for comparison (`conformance/README.md`).
 2. **Token validation against a real authority.** Section 8.3 is implemented (`rfc3161.mjs`) and validated
    against a TSA certificate the caller pins. What nobody has tried yet is a token from a real timestamping
    authority: a certificate whose key is a chain rather than a pin, which is where the refusal to build

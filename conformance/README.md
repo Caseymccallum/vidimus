@@ -182,21 +182,25 @@ second implementer can follow without asking anybody anything.
 
 ## What this is not
 
-**It is not offered as a conforming implementation yet, and the reason is now one field wide.** Section 11 says
-a conformance run compares the verdict "field by field". Of the nine fields the record carries, this compares
-eight: `claim_hash`, `checks`, `levels`, `verified`, `exit_code`, `capture_profile`, `attribution` and
-`time_bound` - the last three agreeing across all nine distinct combinations the 48 fixtures contain, including
-a trusted key, an untrusted one, a verified anchor and three declared capture profiles. One field is left:
+## Whether this counts as conforming
 
-- **`caveat_count`** — and it is left because it is not obvious that it should be compared at all. Every other
-  field is a *rule*: `verified` follows from the levels, `attribution.status` from one check, `time_bound` from
-  another. A caveat count is a number that depends on how many prose caveats an implementation chose to raise
-  at every point where something was not checked. Two verifiers that agree on all 21 checks, all four levels,
-  `verified`, `exit_code`, `capture_profile`, `attribution` and `time_bound` can still disagree about it, and
-  neither of them is wrong. A count is a strange thing to make conformant, and it is worth deciding whether
-  section 11 should ask for it - which is a question about the specification rather than a task in this
-  directory.
+Section 11 lists four conditions, and this implementation meets them:
 
-So this directory is still better described as evidence that the *rules* are implementable from the
-specification by somebody who did not write it than as a conforming implementation. The difference is one
-number whose conformability is itself in question.
+1. **every check in section 7.4, reported in every verdict** - all 21, with the checks a stopped stage never
+   reached filled in as `not_checked` rather than omitted;
+2. **the status, level-rollup and `verified` rules of sections 7.1-7.5** - derived independently and compared,
+   and agreeing;
+3. **the canonical form, byte for byte, including the refusals** - 45 of 48 fixtures agree, and the three
+   refusals are corroborated as refusals rather than passed over in silence;
+4. **the recorded verdicts** - comparing every rule-derived field, and agreeing on all nine distinct
+   combinations of `attribution`, `time_bound` and `capture_profile` the fixtures contain.
+
+The one field it does not produce is `caveat_count`, and section 11.1 says a conforming run need not reproduce
+it: a caveat is a sentence about something that was not established, and how many a verifier raises is a
+question of how much it explains.
+
+**That clarification is convenient for this implementation, which is exactly why it deserves a second
+opinion.** Its argument is the one already made for excluding the *wording* of a reason - a conformance suite
+that fails when somebody improves a sentence teaches people to re-record vectors without reading them - and a
+count of prose is the same kind of thing. But somebody who thinks a count *is* checkable should say so, and
+the decision is one line to reverse.

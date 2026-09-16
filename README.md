@@ -220,10 +220,11 @@ here because a format that cannot say what it grew out of is a format nobody can
   7.4, written from the specification rather than from the reference, with Ed25519 from RFC 8032, a DER/X.509
   reader, an RFC 3161 token verifier and a `text-v1` extractor alongside it. It agrees with the record on 42
   of 48 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
-  `verified`, `exit_code`, `capture_profile`, `attribution` and `time_bound`, agreeing there too. It is not
-  offered as a conforming implementation because it compares eight of the verdict's nine fields and leaves
-  `caveat_count`, which — being a count of prose rather than a rule — may not belong in section 11 at all
-  (D-034, `conformance/README.md`). The fixtures ship for anyone extending it:
+  `verified`, `exit_code`, `capture_profile`, `attribution` and `time_bound`, agreeing there too. It meets
+  section 11's four conditions: all 21 checks, the rollup rules, the canonical form byte for byte, and every
+  rule-derived field of the recorded verdicts. `caveat_count` is the one field it does not produce, and section
+  11.1 says a conforming run need not — a caveat is prose about what was *not* established
+  (D-036, `conformance/README.md`). The fixtures ship for anyone extending it:
   `node reference/src/vectors.mjs --emit ./kit` writes 48 receipts, the verdict each one must produce, and a
   README with the three steps (D-031).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the

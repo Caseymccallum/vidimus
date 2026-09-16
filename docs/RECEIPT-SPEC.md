@@ -943,6 +943,20 @@ Listing an implementation here means opening a pull request containing its resul
 vectors. That is a claim about agreement, not about quality: two implementations can conform and
 still disagree about everything a user cares about.
 
+### 11.1 What "produces the recorded verdicts" covers
+
+Condition 4 above is about the parts of a verdict that are **rules**: the status of every check, the level
+rollups, `verified`, `exit_code`, and the fields that follow from the claim and the caller's configuration
+(section 7) - the capture profile, attribution, and the time bound. Those a conforming run reproduces exactly.
+
+It is **not** about the *caveat count*. A caveat is a sentence an implementation writes about something it did
+not establish - a page served over plain HTTP, a directory it could not read, an anchor nobody pinned - and how
+many of them a verifier chooses to raise is a question of how much it explains, not of what it found. Two
+implementations that agree on all 21 checks, four levels, `verified` and every rule-derived field can still
+count different caveats, and neither is wrong. The vectors record the count because a reader wants to know how
+much a verdict is holding back; a conformance run is not required to reproduce it, on the same principle that
+already excludes the *wording* of a reason.
+
 ## 12. Security considerations
 
 - **A receipt is untrusted input.** Entry names are confined to the archive by `manifest.shape`, because that

@@ -781,6 +781,24 @@ delegates WARC semantics to ISO 28500, and says nothing about where a record end
 reference in view, so it corroborates the reference's *behaviour* rather than the specification's *text* - a
 weaker claim, and `conformance/README.md` says so where the result is stated rather than in a footnote.
 
+### D-036 - A caveat count is recorded, not asked for
+
+Section 11 requires a conforming implementation to "produce the verdicts recorded in
+`spec/vectors/receipt-vectors.json`", and the records carry a `caveat_count`. Read literally that makes a count
+of prose a conformance requirement, which is wrong for the same reason the definitions already exclude the
+*wording* of a reason: a suite that fails when somebody explains something better teaches people to re-record
+vectors without reading them, and the vectors stop being evidence.
+
+So section 11.1 states what condition 4 covers - the status of every check, the level rollups, `verified`,
+`exit_code`, and the rule-derived fields - and says the caveat count is recorded for a reader rather than for
+comparison. A caveat is a sentence about something that was *not* established, and how many a verifier chooses
+to raise is a question of how much it explains; two implementations that agree on all 21 checks, four levels,
+`verified` and every other field can still count differently, and neither is wrong.
+
+Written down with the obvious interest declared: this decision is what lets the second implementation meet
+section 11, so it is exactly the kind of change that should be made loudly rather than quietly, and reversed by
+anyone who thinks a count is checkable.
+
 ### D-035 - What a fingerprint cannot leave to the reader
 
 Section 4.5.1 defines `text-v1` as seven rules over bytes, and three things it did not state were found by

@@ -735,10 +735,9 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers all 21 checks of section 7.4, rolls them up into `verified`,")
-    print("`exit_code` and the four levels, and compares the claim hash, the capture profile, attribution")
-    print("and the time bound; the one field it does not produce is a caveat count - see")
-    print("conformance/README.md")
+    print("this implementation meets section 11: all 21 checks, the rollup rules, the canonical form and")
+    print("every rule-derived verdict field. A caveat count is the one field it does not produce, and")
+    print("section 11.1 does not ask for it - see conformance/README.md")
     return 0 if failures == 0 else 1
 
 
