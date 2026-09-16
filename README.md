@@ -216,13 +216,14 @@ here because a format that cannot say what it grew out of is a format nobody can
 
 ## What is deliberately not here yet
 
-- **A second implementation — started.** `conformance/` is a Python implementation of 18 of the 21 checks:
-  the container, the claim, the claim hash, the capture's document and the signature family, written from the
-  specification rather than from the reference, with Ed25519 from RFC 8032 alongside it. It agrees with the
-  record on 42 of 45 fixtures, corroborates 3 refusals, and disagrees on none — and the three checks it does
-  not implement need an anchor parser and a text extractor (D-034, `conformance/README.md`). The fixtures ship
-  for anyone extending it: `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each
-  one must produce, and a README with the three steps (D-031).
+- **A second implementation — started.** `conformance/` is a Python implementation of 19 of the 21 checks:
+  the container, the claim, the claim hash, the capture's document, the signature family and whether an anchor
+  is present, written from the specification rather than from the reference, with Ed25519 from RFC 8032
+  alongside it. It agrees with the record on 42 of 45 fixtures, corroborates 3 refusals, and disagrees on
+  none — and the two checks it does not implement are `anchor.verified` (an RFC 3161 token) and
+  `subject.text` (D-034, `conformance/README.md`). The fixtures ship for anyone extending it:
+  `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each one must produce, and a
+  README with the three steps (D-031).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
 - **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites.

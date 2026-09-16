@@ -41,6 +41,7 @@ from pathlib import Path
 import ed25519
 import container
 import warc
+import anchor
 
 # Section 6.4: the message a signature covers, looked up by major version rather than built from a constant,
 # because this string is inside every signature ever produced (D-013, D-015).
@@ -273,6 +274,7 @@ MODELLED_CHECKS = (
     "signature.alg",
     "signature.key_id",
     "signature.verify",
+    "anchor.present",
 )
 
 
@@ -425,8 +427,14 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     statuses["manifest.parseable"] = "pass"
 
     def finish(statuses: dict, derived: str | None) -> tuple[list[str], str]:
-        """Add the attribution checks, which run whenever a claim parsed - however the claim itself went."""
+        """Add the attribution and anchor checks, which run whenever a claim parsed.
+
+        A claim that failed its own stage still says who signed it and what it is anchored to, and the record
+        reports both - so these run however the claim itself went. Only the anchor check is modelled here;
+        `anchor.verified` is not, and is simply absent from the comparison.
+        """
         statuses.update(signature_statuses(manifest, derived))
+        statuses.update(anchor.anchor_statuses(manifest))
         return (compare(fill(statuses), checks), _outcome(statuses, checks))
 
     version = manifest.get("spec_version")
@@ -541,8 +549,8 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers 18 of the 21 checks: the container, the claim, the claim hash, the")
-    print("capture's document and the signature family; see conformance/README.md")
+    print("this implementation covers 19 of the 21 checks: the container, the claim, the claim hash, the")
+    print("capture's document, the signature family and whether an anchor is present; see conformance/README.md")
     return 0 if failures == 0 else 1
 
 

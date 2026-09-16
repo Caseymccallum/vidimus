@@ -12,10 +12,10 @@ corroboration."* This directory is the beginning of that, and it is deliberately
 | `verify_claims.py` | The container, the claim, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 3, 5, 6, 7 and 12) rather than from `reference/`. No dependencies beyond the standard library. |
 | `container.py` | Reading a receipt's ZIP, the names inside it, and the WACZ capture it names - including the resource hashes the capture advertises for itself. |
 | `warc.py` | The record layer: the magic that separates records, the HTTP block, the WARC-Payload-Digest a record states for itself, and the body cut to the length the response declares. The smallest reader that can answer one question - what was the main document (section 4.2). |
+| `anchor.py` | `anchor.present`, and only that: whether the claim carries an anchor and whether its type is one this implementation knows (sections 7.4, 8.1, 8.3). |
 | `ed25519.py` | Ed25519 verification, written from RFC 8032. Python's standard library has none, and checking a signature with the same library in two languages would be one check rather than two. |
 
-It covers **18 of the 21 checks**: everything except the three that need an anchor parser (`anchor.present`,
-`anchor.verified`) and a text extractor (`subject.text`).
+It covers **19 of the 21 checks**: everything except `anchor.verified` and `subject.text`.
 
 **One of those layers is a weaker check than the others, and it is worth saying which.** The container, the
 claim and the signature layers were written from `docs/RECEIPT-SPEC.md` alone, with `reference/` unopened -
@@ -93,13 +93,24 @@ picture. Both were reported by the kit as disagreements, and both were this impl
    consequences, and `claim-not-canonical` and `claim-contains-a-float` are the two vectors that tell them
    apart.
 
+And one thing the specification got *right*, which is worth recording in a document that is otherwise a list
+of what it got wrong. Section 8.1 requires an anchorless claim to report `anchor.present: not_applicable` and
+`anchor.verified: not_checked` - an asymmetry that looks like a mistake until the reason is read ("there is
+nothing here to have a type" against "there was nothing to verify, and this receipt does not have a verified
+time"). It is stated, it is complete, and implementing it from the text alone reproduced all four statuses that
+check can produce, across 45 fixtures - including the `unsupported` an unknown type gets, which is the rule a
+naive implementation would get wrong by calling it a failure. Section 8 is the part of this specification a
+second implementer can follow without asking anybody anything.
+
 ## What this is not
 
 **It is not a conforming implementation, and it must not be listed as one.** Section 11 requires every check
-in section 7.4: this implements 18 of the 21, and the three it does not — `anchor.present`,
-`anchor.verified` and `subject.text` — are the ones that need an anchor parser and a text extractor.
+in section 7.4: this implements 19 of the 21, and the two it does not — `anchor.verified` and `subject.text` —
+are the two that need machinery rather than rules.
 
-The next slice is **`anchor.present`** — cheap, and it needs only the anchor types the format defines — and
-then **`anchor.verified`**, which is the large one: DER parsing, an X.509 certificate, RSA signature
-verification by modular exponentiation, and the RFC 3161 token's own `messageImprint` compared against the
-claim hash. It is the last check that a second implementation can reach without a text fingerprint.
+The next slice is **`anchor.verified`**, which is the largest single piece left: DER parsing, an X.509
+certificate and its `timeStamping` extended key usage, RSA signature verification by modular exponentiation,
+the CMS signed attributes that bind the signature to the `TSTInfo`, and the token's own `messageImprint`
+compared against the claim hash — all four of section 8.3's steps, where getting three of them right and
+answering "yes" early is the failure section 8.3 was written to prevent. After that, `subject.text` needs a
+`text-v1` extractor (section 4.5), which is a different kind of work again.

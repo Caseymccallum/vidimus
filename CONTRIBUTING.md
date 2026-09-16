@@ -21,8 +21,8 @@ worth more than any amount of additional code.
    ```
 
    The recorded answers are statuses and not prose, so an implementation that disagrees with every word of
-   our reasons is still conformant. The next slice is `anchor.present`, then `anchor.verified` - DER, an X.509
-   certificate, RSA verification and an RFC 3161 token - which would take it to 20 of 21
+   our reasons is still conformant. The next slice is `anchor.verified` - DER, an X.509 certificate, RSA
+   verification, the CMS bindings and an RFC 3161 token - which would take it to 20 of 21
    (`conformance/README.md`).
 2. **Token validation against a real authority.** Section 8.3 is implemented (`rfc3161.mjs`) and validated
    against a TSA certificate the caller pins. What nobody has tried yet is a token from a real timestamping
