@@ -11,10 +11,22 @@ corroboration."* This directory is the beginning of that, and it is deliberately
 | --- | --- |
 | `verify_claims.py` | The container, the claim, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 3, 5, 6, 7 and 12) rather than from `reference/`. No dependencies beyond the standard library. |
 | `container.py` | Reading a receipt's ZIP, the names inside it, and the WACZ capture it names - including the resource hashes the capture advertises for itself. |
+| `warc.py` | The record layer: the magic that separates records, the HTTP block, the WARC-Payload-Digest a record states for itself, and the body cut to the length the response declares. The smallest reader that can answer one question - what was the main document (section 4.2). |
 | `ed25519.py` | Ed25519 verification, written from RFC 8032. Python's standard library has none, and checking a signature with the same library in two languages would be one check rather than two. |
 
-It covers **17 of the 21 checks**: everything except the four that need an anchor, a WARC reader or a text
-extractor (`anchor.present`, `anchor.verified`, `subject.document`, `subject.text`).
+It covers **18 of the 21 checks**: everything except the three that need an anchor parser (`anchor.present`,
+`anchor.verified`) and a text extractor (`subject.text`).
+
+**One of those layers is a weaker check than the others, and it is worth saying which.** The container, the
+claim and the signature layers were written from `docs/RECEIPT-SPEC.md` alone, with `reference/` unopened -
+that is what makes them corroboration. `warc.py` was not: section 9 delegates WARC semantics to ISO 28500
+("the verifier reads the response record for `subject.url` and the body after its HTTP headers, and nothing
+else"), which does not say how records are separated, how a stated `Content-Length` is treated, or whether a
+record's own `WARC-Payload-Digest` is honoured. So that layer was written with the reference in view, and it
+corroborates *understanding of the reference's behaviour* rather than of the specification's text. The
+vectors still make it worth having - it is a second implementation of the same rules, in a different
+language, over 14 fixtures - but it is not the same class of evidence, and calling it the same would be the
+kind of overstatement this project is arranged against.
 
 ```bash
 node reference/src/vectors.mjs --emit ./kit        # the fixtures and the answers
@@ -37,8 +49,9 @@ record agrees that they are refused.
 
 ## What writing it found
 
-Six things that only showed up when somebody implemented the format somewhere else. The first four are now
-fixed in the specification, and two have vectors of their own.
+Seven things that only showed up when somebody implemented the format somewhere else. Two are fixed in the
+specification; the rest are named as open, because a list that reads as if it were closed is worse than no
+list at all.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
    through `JSON.parse`, so the reference rejects it there; Python's `json` returns `0`, and the sign is gone
@@ -53,17 +66,25 @@ fixed in the specification, and two have vectors of their own.
    `signature-shape-broken`. The kit caught it on the first run, which is the whole argument for recording
    statuses rather than prose: an implementer can disagree with every sentence in the specification and still
    be told, precisely, which check they got wrong.
-4. **The safe-entry-name rule is only in code.** Section 12 states the principle (*"no absolute paths, no
+4. **The WARC-reading rules are not in the specification.** Section 9 says a verifier reads *"the response
+   record for `subject.url` and the body after its HTTP headers, and nothing else"*. That sentence does not
+   say where one record ends and another begins (the reference searches for the seven bytes `WARC/1.0`
+   anywhere in the inflated stream, so a payload containing them would split a record in two); whether an
+   HTTP `Content-Length` is trusted and what a *longer* one means (a truncated capture, refused); or whether
+   the record's own `WARC-Payload-Digest` is checked (it is, and a mismatch stops the read). A second
+   implementer has to read another implementation to find any of that out, which is the one thing this
+   project is arranged against.
+
+5. **The safe-entry-name rule is only in code.** Section 12 states the principle (*"no absolute paths, no
    `..`, no backslashes, no drive letters"*) and the enumeration — the length cap, the refusal of `//`, of a
-   trailing dot-segment, of a colon — is in `reference/src/verify.mjs`. A second implementer cannot infer a
+   colon, of a trailing dot-segment — is in `reference/src/verify.mjs`. A second implementer cannot infer a
    list from a principle, and this implementation guessed at `MAX_ENTRY_NAME` rather than reading it. **The
-   specification should state the list.** It is not yet fixed, and that is stated here rather than left as an
-   implication.
+   specification should state the list.**
 
 And two about *when* checks run, which the specification states as a principle and an implementer needs as a
 picture. Both were reported by the kit as disagreements, and both were this implementation's fault:
 
-5. **The stages are not a chain.** A claim that fails the *claim* stage still has its **signature** checked:
+6. **The stages are not a chain.** A claim that fails the *claim* stage still has its **signature** checked:
    attribution depends on a manifest having parsed, not on the claim being sound. This implementation
    modelled a linear pipeline, so a receipt with an unknown `spec_version` reported three attribution statuses
    as `not_checked` where the record says `pass`. Equally, a claim whose bytes are not canonical is
@@ -75,10 +96,10 @@ picture. Both were reported by the kit as disagreements, and both were this impl
 ## What this is not
 
 **It is not a conforming implementation, and it must not be listed as one.** Section 11 requires every check
-in section 7.4: this implements 17 of the 21, and the four it does not — `anchor.present`, `anchor.verified`,
-`subject.document` and `subject.text` — are exactly the ones that need an anchor parser, a WARC reader and a
-text extractor rather than a claim.
+in section 7.4: this implements 18 of the 21, and the three it does not — `anchor.present`,
+`anchor.verified` and `subject.text` — are the ones that need an anchor parser and a text extractor.
 
-The next slice is **`subject.document`**: reading the response record out of the WACZ's WARC and comparing its
-body with the digest the claim states. It needs a WARC reader (the record boundaries, the HTTP block, the
-length) and it would take the count to 18 of 21.
+The next slice is **`anchor.present`** — cheap, and it needs only the anchor types the format defines — and
+then **`anchor.verified`**, which is the large one: DER parsing, an X.509 certificate, RSA signature
+verification by modular exponentiation, and the RFC 3161 token's own `messageImprint` compared against the
+claim hash. It is the last check that a second implementation can reach without a text fingerprint.

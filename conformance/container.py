@@ -48,6 +48,9 @@ CONTAINER_CHECKS = (
 # Every entry of a WACZ is a name this format admits, or it is not looked up at all.
 MAX_ENTRY_NAME = 255
 
+# Distinguishes "the caller did not read the inner archive" from "the caller read it and there is none".
+_UNSET = object()
+
 
 def is_safe_entry_name(name) -> bool:
     """Whether a name inside a receipt is one this format admits.
@@ -77,11 +80,26 @@ def entries_of(source) -> dict[str, bytes]:
         }
 
 
-def container_statuses(entries: dict[str, bytes] | None, manifest: dict) -> dict:
+def wacz_entries(contents: bytes | None) -> dict[str, bytes] | None:
+    """The entries of a capture, or None when there are none to read.
+
+    One read serves three checks - the resource hashes, `capture.wacz.readable`, and the document a verifier
+    re-derives from the WARC (section 4.2) - so the caller reads once and passes the result down.
+    """
+    if contents is None:
+        return None
+    try:
+        return entries_of(contents)
+    except zipfile.BadZipFile:
+        return None
+
+
+def container_statuses(entries: dict[str, bytes] | None, manifest: dict, inner=_UNSET) -> dict:
     """The container checks, as this implementation sees them.
 
     `entries` is None when the container itself could not be read, in which case everything that depends on it
     is `not_checked` - section 7.2: a verdict contains every check, and one that never ran is not a pass.
+    `inner` is the capture's own entries, when the caller has already read them.
     """
     if entries is None:
         return dict.fromkeys(CONTAINER_CHECKS, "not_checked")
@@ -110,8 +128,10 @@ def container_statuses(entries: dict[str, bytes] | None, manifest: dict) -> dict
     statuses["capture.media_type"] = "pass"
 
     try:
-        inner = entries_of(contents)
+        inner = entries_of(contents) if inner is _UNSET else inner
     except zipfile.BadZipFile:
+        inner = None
+    if inner is None:
         return stopped({**statuses, "capture.wacz.readable": "fail"})
     statuses["capture.wacz.readable"] = "pass"
 

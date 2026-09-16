@@ -40,6 +40,7 @@ from pathlib import Path
 
 import ed25519
 import container
+import warc
 
 # Section 6.4: the message a signature covers, looked up by major version rather than built from a constant,
 # because this string is inside every signature ever produced (D-013, D-015).
@@ -203,6 +204,46 @@ def parse_manifest(raw: bytes) -> dict:
     return json.loads(text, parse_constant=refuse)
 
 
+def document_status(inner: dict[str, bytes] | None, manifest: dict) -> tuple[str, str | None]:
+    """`subject.document`, re-derived from the capture (sections 4.2 and 7.4).
+
+    Both the digest and the length are checked. The length is redundant with the digest and kept anyway,
+    because it is the one a person checks by eye - and "the claim describes a document of another size" is a
+    different sentence from "the bytes hash differently".
+
+    A capture this reader cannot open is `not_checked` with the reason, never a `fail` and never a `pass`: the
+    claim may be perfectly honest and the capture simply beyond this reader, and what must not happen is L0
+    passing on the strength of a digest nobody confirmed (section 4.2, D-032).
+    """
+    subject = manifest.get("subject")
+    document = subject.get("document") if isinstance(subject, dict) else None
+    if not isinstance(document, dict):
+        return ("not_checked", "the claim does not describe a document")
+
+    if inner is None:
+        return ("not_checked", "the capture this claim describes is not a readable container")
+
+    try:
+        body = warc.main_document(inner, subject.get("url"))
+    except warc.WarcError as error:
+        return ("not_checked", "the capture's document could not be re-read: %s" % error)
+
+    digest = hashlib.sha256(body).hexdigest()
+    if digest != document.get("sha256"):
+        return (
+            "fail",
+            "the capture holds a document that hashes to %s, and the claim says %s"
+            % (digest, document.get("sha256")),
+        )
+    if len(body) != document.get("bytes"):
+        return (
+            "fail",
+            "the capture holds a %d-byte document, and the claim says %s"
+            % (len(body), document.get("bytes")),
+        )
+    return ("pass", None)
+
+
 def from_base64url(value: str) -> bytes:
     """The bytes of a base64url field, without padding, as the claim carries them."""
     return urlsafe_b64decode(value + "=" * (-len(value) % 4))
@@ -227,6 +268,7 @@ MODELLED_CHECKS = (
     "capture.media_type",
     "capture.wacz.readable",
     "capture.wacz.resources",
+    "subject.document",
     "signature.present",
     "signature.alg",
     "signature.key_id",
@@ -423,13 +465,21 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
             _outcome(statuses, checks),
         )
 
-    # 4. The shape and the capture, then the attribution checks. A claim that failed the canonical form still
-    #    gets its capture checked - only a *shape* failure stops the capture stage - and the signature never
-    #    depended on the claim being sound at all.
+    # 4. The shape, the capture, the document it holds, then the attribution checks. A claim that failed the
+    #    canonical form still gets its capture checked - only a *shape* failure stops the capture stage - and
+    #    the signature never depended on the claim being sound at all.
+    capture = manifest.get("capture")
+    capture_bytes = (
+        entries.get(capture["path"])
+        if isinstance(capture, dict) and isinstance(capture.get("path"), str)
+        else None
+    )
+    inner = container.wacz_entries(capture_bytes)
     statuses.update({
-        key: value for key, value in container.container_statuses(entries, manifest).items()
+        key: value for key, value in container.container_statuses(entries, manifest, inner).items()
         if key != "container.readable"
     })
+    statuses["subject.document"] = document_status(inner, manifest)[0]
     return finish(statuses, derived)
 
 
@@ -491,8 +541,8 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers 17 of the 21 checks: the container, the claim, the claim hash and")
-    print("the signature family; see conformance/README.md")
+    print("this implementation covers 18 of the 21 checks: the container, the claim, the claim hash, the")
+    print("capture's document and the signature family; see conformance/README.md")
     return 0 if failures == 0 else 1
 
 

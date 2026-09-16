@@ -738,7 +738,7 @@ Three decisions about how it was done, which matter more than what it covered:
 1. **Written from the specification, not from the reference.** The rules came from sections 5, 5.1, 5.2 and
    6.1. Where the two disagreed, the disagreement was the finding rather than something to silently match -
    and there were three of them, all now fixed in the specification (below).
-2. **One layer at a time, complete, and named as partial.** It implements 17 of the 21 checks and says so in
+2. **One layer at a time, complete, and named as partial.** It implements 18 of the 21 checks and says so in
    its own output; `conformance/README.md` states that it must not be listed as a conforming implementation.
    A second implementation that quietly covered half the table would be worse than none, because "agreement"
    would then mean less than it sounds like.
@@ -768,11 +768,17 @@ Three decisions about how it was done, which matter more than what it covered:
 And two vectors came out of it that would not otherwise exist: the control-character case, and
 `claim-contains-minus-zero`. Both pin behaviour that the vector set had been asserting in prose only.
 
-**The signature family followed**, with Ed25519 written from RFC 8032 in `conformance/ed25519.py`: Python's
-standard library has none, and checking a signature with the same library in two languages would be one check
-rather than two. That takes the second implementation to 6 of the 21 checks, and it means every signed
-fixture is verified twice - once by `node:crypto`, once by arithmetic written from the RFC - over a message
-built from the claim hash each implementation derived itself.
+**The signature family and the capture's document followed** — Ed25519 written from RFC 8032 in
+`conformance/ed25519.py`, and the record layer in `conformance/warc.py`. That takes the second implementation
+to 18 of the 21 checks, and it means every signed fixture is verified twice: once by `node:crypto`, once by
+arithmetic written from the RFC, over a message built from the claim hash each implementation derived itself.
+
+One thing that layer is *not*, and the distinction is the point of the exercise. The container, the claim and
+the signature layers were written from the specification alone. The record layer could not be: section 9
+delegates WARC semantics to ISO 28500, and says nothing about where a record ends, what a stated
+`Content-Length` means, or whether a record's own `WARC-Payload-Digest` is checked. It was written with the
+reference in view, so it corroborates the reference's *behaviour* rather than the specification's *text* - a
+weaker claim, and `conformance/README.md` says so where the result is stated rather than in a footnote.
 
 ## 3. What this implementation deliberately does not have
 
