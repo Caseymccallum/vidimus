@@ -125,6 +125,10 @@ function isObject(value) {
  *   verifier: { name: string, version: string },
  *   receipt: { spec_version: string | null, claim_hash: string | null, entries: string[] },
  *   capture: { profile: string | null, profile_known: boolean | null },
+ *   subject: {
+ *     url: string | null, final_url: string | null, status: number | null, captured_at: string | null,
+ *     document_sha256: string | null, document_bytes: number | null, text_sha256: string | null,
+ *   },
  *   verified: boolean,
  *   exit_code: 0 | 1 | 2,
  *   levels: Record<string, { status: string, name: string, claim: string }>,
@@ -220,6 +224,24 @@ export async function verifyReceipt(bytes, options = {}) {
       profile: typeof manifest?.capture?.profile === 'string' ? manifest.capture.profile : null,
       profile_known: typeof manifest?.capture?.profile === 'string'
         ? KNOWN_CAPTURE_PROFILES.has(manifest.capture.profile)
+        : null,
+    },
+    // What the claim actually asserts, lifted where it is a plain fact. Without this a verdict names a
+    // claim hash and not the page: a program reading the JSON had no way to ask "which URL, and which
+    // words?" except by opening the claim itself, in its own way, with its own parser (D-026).
+    subject: {
+      url: typeof manifest?.subject?.url === 'string' ? manifest.subject.url : null,
+      final_url: typeof manifest?.subject?.final_url === 'string' ? manifest.subject.final_url : null,
+      status: Number.isInteger(manifest?.subject?.status) ? manifest.subject.status : null,
+      captured_at: typeof manifest?.capture?.captured_at === 'string' ? manifest.capture.captured_at : null,
+      document_sha256: typeof manifest?.subject?.document?.sha256 === 'string'
+        ? manifest.subject.document.sha256
+        : null,
+      document_bytes: Number.isInteger(manifest?.subject?.document?.bytes)
+        ? manifest.subject.document.bytes
+        : null,
+      text_sha256: typeof manifest?.subject?.text?.sha256 === 'string'
+        ? manifest.subject.text.sha256
         : null,
     },
     verified,

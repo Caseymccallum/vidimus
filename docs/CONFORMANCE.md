@@ -26,10 +26,11 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 121 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
+| `npm test` | 130 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. |
+| `node reference/src/cli.mjs check <file>` | The comparison with the page as it is now: the only command that makes a request, and the only one whose output includes a currency report. `--require-same-words` makes that report, rather than the receipt, decide the exit code. |
 | `node reference/src/cli.mjs seal <capture.wacz> --key <key.json>` | The producer: it builds a claim from a capture, signs it, and verifies its own output before reporting success (D-017). |
 | `node reference/src/cli.mjs keygen --out <key.json>` | A signing key, written with its derived key id, and a warning about what that file is. |
 
@@ -73,6 +74,8 @@ Grouped by what they are for:
 | **Happy paths** | `valid-signed`, `valid-signed-trusted`, `valid-signed-trusted-wrong`, `valid-unsigned`, `valid-http-page`, `valid-with-text`, `valid-signed-with-notes` |
 | **Tampering with the capture** | `capture-digest-mismatch`, `capture-resource-mismatch`, `capture-length-wrong`, `capture-not-a-wacz`, `capture-media-type-unknown`, `capture-missing` |
 | **Tampering with the claim** | `claim-edited-after-signing`, `claim-not-canonical`, `claim-contains-a-float`, `spec-version-unknown`, `manifest-missing`, `manifest-not-json`, `capture-path-escapes` |
+| **The text fingerprint** | `text-fingerprint-wrong` - a claim whose fingerprint is plausible and not what its capture says. Kept because it was a real bug in this project's own fixture |
+| **The capture profile** | `capture-profile-declared`, `capture-profile-wire`, `capture-profile-unrecognised` - declared, reported, never judged |
 | **Signature** | `signature-from-another-claim`, `signature-key-id-mismatch`, `signature-algorithm-unsupported`, `signature-shape-broken` |
 | **Anchors** | `anchor-chain-head`, `anchor-chain-linked`, `anchor-chain-unlinked`, `anchor-chain-unfollowed`, `anchor-chain-head-with-predecessor`, `anchor-bolted-on`, `anchor-rfc3161-unimplemented`, `anchor-unknown-type` |
 | **Container** | `container-not-a-zip`, `container-with-stray-entry` |
@@ -99,7 +102,7 @@ Named here, with what each would take, so that none of them is mistaken for a de
 | --- | --- | --- |
 | **RFC 3161 anchors** | `anchor.verified: unsupported` | A CMS `SignedData` parser, chain validation against a caller-supplied TSA list, `messageImprint` comparison, and `genTime` handling. Section 8.3 of the specification already states the four steps required before a `pass` is allowed, so the work is bounded and the answer cannot be guessed at. |
 | **`subject.document` is not re-derived** | `capture.wacz.resources` passes while the document digest is unchecked | The verifier re-reads a capture's document to check the text fingerprint, and does not compare it with `subject.document.sha256`. Comparing them is a new check rather than new code, so it needs a specification change and vectors - named in section 9 of the specification as a candidate for 0.2. |
-| **Level 3 (currency)** | Not performed at all | A specified comparison: what to fetch, what to compare, and a report format for "the bytes changed and the words did not". It must stay outside `verified`, and it must be impossible to trigger by accident. |
+| **Level 3 (currency)** | L3 verifies the claim's own fingerprint; nothing compares a receipt with the live page | The comparison is specified (section 7.7 of the specification) and implemented as `vidimus check`: it verifies the receipt, fetches the URL, seals a second receipt for what the page says now, and prints a report with five outcomes - including "the bytes changed and the words did not". It never touches `verified`, and `--require-same-words` opts in to letting the comparison decide an exit code. |
 | **Size limits** | `container.readable` accepts any declared entry size | A cap applied before inflating, and a status for a receipt that exceeds it. Recorded as a limitation in the specification and the threat model so that it is not mistaken for a design choice. |
 | **A second implementation** | Section 11's conformance list | Another language reading the same vectors. Until then the vectors pin one implementation's answers, which is agreement rather than corroboration, and the threat model says as much. |
 | **ZIP64, encrypted entries and unknown methods, in a browser** | `container.readable: unsupported` | The browser's reader handles stored and deflated entries. Everything else it refuses by name: ZIP64 and multi-disk archives because a browser cannot inflate across them, encryption because no browser API reads it. The command line has the same limits, and says so in its own message. |

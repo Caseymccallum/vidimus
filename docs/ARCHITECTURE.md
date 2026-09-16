@@ -441,6 +441,50 @@ is exactly what a producer whose extractor disagreed with the definition would e
 be a new check rather than a new implementation, and the specification's section 9 names it as a candidate
 for 0.2 rather than leaving a reader to assume the two are the same thing.
 
+### D-025 - The comparison with the page now is a command of its own, with its own report
+
+`verify` reads no clock and makes no request, so "does the page still say this?" is not a question it can
+answer. The tempting shortcut - have `verify` fetch when a flag is given - would make a verdict depend on
+whether the machine had a network, which is the same receipt verifying differently in two places for a
+reason that has nothing to do with the receipt (D-005).
+
+So the comparison is `vidimus check`, and it is a separate command rather than a flag on `verify`:
+
+- **It says what it is doing.** Its own name, its own output, and a line that names the request it is about
+  to make. "Impossible to run by accident" is a property of the interface, not of a warning.
+- **It compares two claims, not a claim and a fetch.** The second look is sealed into a real receipt by the
+  same producer, so both fingerprints were computed by the same rules over the same kind of input. That is
+  what lets `words_unchanged` mean anything at all.
+- **The report is a separate object** (`reference/src/currency.mjs`), returned and printed beside the
+  verdict and never merged into it.
+- **The exit code is the verdict's**, unless `--require-same-words` is passed, in which case the comparison
+  decides: `0` the words are unchanged, `1` they are not, `2` they could not be compared. A build that
+  fails because a page changed is a decision somebody made; a build that fails because a page changed while
+  claiming to check a receipt is not.
+
+The outcome set is five values rather than a boolean, because the useful cases are not "same" and
+"different": `words_unchanged` is the one people cannot construct for themselves from two hashes without
+getting the framing wrong, and `gone` exists so that a 404 is never reported as a page whose words changed.
+
+**Rejected:** a `--fetch` flag on `verify` (a verdict that depends on the network); an `L3` check that
+compares against a fetched page (checks must be answerable by a verifier holding the file, and this one is
+not); and adding the comparison to the verdict JSON (the two would be read as one answer).
+
+### D-026 - The verdict reports what the claim asserts
+
+`subject` in the verdict JSON: the URL, the final URL, the status, the capture time, the document digest
+and its length, and the text fingerprint - each `null` when the claim does not carry it.
+
+This exists because `check` needs it and the alternative was worse. A command that compares a receipt with
+a page has to know which URL to fetch and which words to compare against, and without this field it would
+have to open `receipt.json` itself, canonical form and all - a second parser for the format in the one
+module that is deliberately thin (`cli.mjs`). A verdict that cannot say *what the claim asserts* is also a
+poor thing to hand a program: before this, a script could read a claim hash and nothing about the page.
+
+What it is not: a check. Nothing here is judged, and no level depends on it. It is the same kind of
+information as `capture.profile` - reported so a reader knows what they are holding (section 4.4), not
+offered as evidence that it is true.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

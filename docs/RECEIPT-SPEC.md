@@ -599,6 +599,59 @@ own. The JSON verdict exists for programs; this exists for the person deciding w
 the thing - and it is the summary, not the JSON, that decides whether they trust the wrong part
 of it.
 
+### 7.7 Currency: the comparison, and why a verifier does not perform it
+
+The question L3 does **not** answer is the one people ask most often: *is this still true?* Answering it
+needs a request to the page, and a verifier that made one would be a verifier whose verdict depended on
+whether it had a network - the same receipt verified differently in two places, for a reason that has
+nothing to do with the receipt. So the comparison is a **separate act with its own report**, and it
+**MUST NOT** change `verified` (section 7.5).
+
+A caller that performs it compares two **claims**: the one in the receipt, and one made now - from a fresh
+capture of the same URL, by the same producer, by the same rules. Comparing a claim with a pile of fetched
+bytes would mean comparing fingerprints computed two different ways.
+
+```json
+{
+  "url": "https://example.org/a-page-worth-citing",
+  "outcome": "words_unchanged",
+  "meaning": "the bytes changed and the words did not",
+  "claimed": { "captured_at": "2026-01-01T00:00:00Z", "status": 200, "document_sha256": "…", "text_sha256": "…" },
+  "now":     { "captured_at": "2026-09-15T12:00:00Z", "status": 200, "document_sha256": "…", "text_sha256": "…" },
+  "differences": ["document_sha256"],
+  "caveats": []
+}
+```
+
+`outcome` is one of:
+
+| Outcome | Means |
+| --- | --- |
+| `unchanged` | The document is byte-for-byte what it was. |
+| `words_unchanged` | **The bytes changed and the words did not.** A nonce, a rotated timestamp, a re-ordered attribute: the page moved, its meaning did not. |
+| `changed` | The words changed. |
+| `gone` | The page did not come back. |
+| `not_compared` | Nothing was compared, and `caveats` says why. |
+
+Three rules make the report worth reading:
+
+1. **`outcome` is about content; `differences` names everything observed.** A page that redirects and
+   serves identical bytes is `unchanged`, with `status` in `differences`. Neither fact hides the other.
+2. **A page that answers with an error is `gone`, never `changed`.** "The words changed" about a 404 is the
+   most misleading answer this comparison could give: the words did not change - the page is not there.
+3. **`captured_at` differs by construction**, and is reported on both sides rather than being counted as a
+   difference. Two captures of one unchanged page always differ in their own packaging.
+
+A claim that declares no text fingerprint can only be compared byte-for-byte, and the report says so as a
+caveat rather than implying a comparison of words that never happened.
+
+`vidimus check` performs this act: it verifies the receipt first (a claim whose bytes do not match its own
+digest is not something to compare a page with), fetches the URL, seals a second receipt for what the page
+says now, and prints the report. `--out` writes that second receipt, so a reader can see what the page said
+at the moment of the comparison rather than taking the report's word for it. `--require-same-words` makes
+the comparison, rather than the receipt, decide the exit code, and it is opt-in so that a comparison can
+never happen - or fail a build - by accident.
+
 ## 8. Time anchors
 
 An anchor is evidence, produced by something other than the author, that the claim hash existed
@@ -686,7 +739,7 @@ a limitation somebody will assume away.
 | Comparing that re-read document with `subject.document.sha256` | no check | The verifier re-reads a capture's document to check the text fingerprint (section 4.5), and does not compare it with the document digest the claim states. So a claim whose `subject.document` described a *different* document would still verify on integrity: what L0 establishes is "these are the bytes this receipt names", not "this claim describes them". A candidate check for 0.2, named here rather than assumed away. |
 | Whether a capture holds the wire bytes or the rendered document | `capture.profile` (section 4.4) | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. A claim now says which kind of capture it holds, and a verifier reports what it declared without judging it: what a capture holds cannot be worked out from its bytes, which is why the field exists. |
 | RFC 3161 token validation | `anchor.verified` | Section 8.3. The check reports `unsupported`, never `pass`. |
-| Level 3 (currency) | a comparison that is not yet specified | It needs the network, and this verifier makes no network requests by design. A **caller** that wants L3 performs the fetch itself and reports the result separately; it **MUST NOT** be folded into `verified`. |
+| Level 3 (currency) | `subject.text`, and the report in section 7.7 | The verifier checks the claim's own fingerprint (section 4.5) and never fetches anything. Whether the page still says the same words is a comparison with its own report, performed by a caller that asks for it - `vidimus check` - and it **MUST NOT** be folded into `verified`. |
 | Key directories and trust roots | `signature.*` | Untrusting a key is a policy decision, and a format that hard-codes trust roots is a format that rots. The verdict reports `key_trusted` from a list the caller supplies (D-007). |
 | Size limits | `container.readable` | Nothing here caps entry sizes, so a hostile receipt can ask a verifier to inflate a large entry. A caller reading untrusted receipts **SHOULD** cap the file it opens, and a 0.2 verifier **SHOULD** refuse declared sizes above a bound. Named because the current behaviour is "it works until it does not". |
 | Provenance of authorship, watermarking | - | Out of scope. A receipt is evidence about a page, not a claim about who wrote it. |
