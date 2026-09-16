@@ -117,6 +117,34 @@ export const CASES = [
     },
   },
   {
+    id: 'attribution-key-directory',
+    description: 'a receipt checked against a key directory that vouches for the signing key',
+    proves: 'section 6.7: trust arrives from the caller or not at all - a directory is the richer way of saying "this key is somebody\'s", and unlike a bare list of key ids it can also say whose, and until when',
+    build: () => buildReceipt({}).bytes,
+    options: {
+      keyDirectory: {
+        kind: 'receipt-key-directory',
+        spec_version: SPEC_VERSION,
+        name: 'Fixture Archive',
+        keys: [{
+          key_id: signer().keyId,
+          public_key: toBase64Url(signer().publicKey),
+          name: 'Fixture Signer',
+          email: 'fixture@example.org',
+          note: 'the key every signed fixture uses',
+          valid_from: '2020-01-01T00:00:00Z',
+          valid_until: '2035-01-01T00:00:00Z',
+        }],
+      },
+    },
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: {},
+    },
+  },
+  {
     id: 'valid-signed-trusted-wrong',
     description: 'a valid signature from a key the caller does not list',
     proves: 'an untrusted key does not make a receipt invalid, and does not make it trusted either',

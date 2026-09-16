@@ -635,34 +635,79 @@ def rollup_fields(manifest: dict | None, options: dict, statuses: dict) -> dict:
     return {"capture_profile": profile, "attribution": attribution, "time_bound": time_bound}
 
 
+def signing_key_id(manifest: dict | None) -> str | None:
+    """The key id a verdict reports: derived from the public key when there is one, else as declared."""
+    signature = manifest.get("signature") if isinstance(manifest, dict) else None
+    if not isinstance(signature, dict):
+        return None
+
+    public_key = signature.get("public_key")
+    if isinstance(public_key, str):
+        try:
+            return hashlib.sha256(from_base64url(public_key)).hexdigest()
+        except Exception:
+            return None
+
+    declared = signature.get("key_id")
+    return declared if isinstance(declared, str) else None
+
+
+def directory_entry(directory, manifest: dict | None) -> dict | None:
+    """The entry a directory holds for this claim's key, or None.
+
+    A directory that cannot be read is treated as *no directory at all* rather than as a directory that does
+    not vouch, because those are different sentences - "nobody told me" and "I was told no" - and they lead to
+    different verdicts. An entry whose `key_id` is not the digest of its own `public_key` is skipped for the
+    same reason a directory refuses one: a directory cannot disagree with itself about which key an id names.
+    """
+    if not isinstance(directory, dict):
+        return None
+    if directory.get("kind") != "receipt-key-directory":
+        return None
+    if not isinstance(directory.get("spec_version"), str):
+        return None
+    keys = directory.get("keys")
+    if not isinstance(keys, list):
+        return None
+
+    key_id = signing_key_id(manifest)
+    if key_id is None:
+        return None
+
+    for candidate in keys:
+        if not isinstance(candidate, dict) or not isinstance(candidate.get("public_key"), str):
+            continue
+        try:
+            derived = hashlib.sha256(from_base64url(candidate["public_key"])).hexdigest()
+        except Exception:
+            continue
+        if derived == candidate.get("key_id") and derived == key_id:
+            return candidate
+    return None
+
+
 def key_trust(manifest: dict | None, options: dict) -> str:
     """Whether the caller says this key is somebody's (section 6.7).
 
-    `trustedKeys` is a list of key ids, and it is the only account of whose key this is that did *not* come
-    from the receipt. A caller that names none gets `not_checked` - not a criticism of the receipt, but the
-    honest state of a question the format deliberately leaves to its reader.
+    Two ways of saying it, and they compose: a bare list of key ids in `trustedKeys`, and a key directory
+    that also says *whose* the key is and until when. Both are the caller's configuration, and neither comes
+    from the receipt - which is the point of the section.
 
-    `keyDirectory` is the richer form of the same configuration, and this implementation does not read one:
-    a caller who supplies only that is reported as `not_checked` rather than guessed at, which is wrong in the
-    one direction that matters least.
+    A caller who supplies neither gets `not_checked`: not a criticism of the receipt, but the honest state of
+    a question the format deliberately leaves to its reader. A caller who supplies one and whose key is not in
+    it gets `untrusted`, which is a different answer and must not be confused with the first.
     """
-    named = options.get("trustedKeys")
-    if not isinstance(named, list) or not named:
+    trusted_keys = options.get("trustedKeys")
+    trusted_keys = trusted_keys if isinstance(trusted_keys, list) else None
+    entry = directory_entry(options.get("keyDirectory"), manifest)
+
+    if trusted_keys is None and entry is None:
         return "not_checked"
+    if entry is not None:
+        return "trusted"
 
-    signature = manifest.get("signature") if isinstance(manifest, dict) else None
-    key_id = None
-    if isinstance(signature, dict):
-        public_key = signature.get("public_key")
-        if isinstance(public_key, str):
-            try:
-                key_id = hashlib.sha256(from_base64url(public_key)).hexdigest()
-            except Exception:
-                key_id = None
-        if key_id is None and isinstance(signature.get("key_id"), str):
-            key_id = signature["key_id"]
-
-    return "trusted" if key_id in named else "untrusted"
+    key_id = signing_key_id(manifest)
+    return "trusted" if key_id is not None and key_id in trusted_keys else "untrusted"
 
 
 def compare_verdict(statuses: dict, verdict: dict, fields: dict | None = None) -> list[str]:

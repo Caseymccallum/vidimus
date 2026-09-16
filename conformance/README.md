@@ -2,14 +2,14 @@
 
 `docs/CONFORMANCE.md` has said since the first draft that the biggest single gap is a second
 implementation: *"the vectors pin one implementation's answers, which is agreement rather than
-corroboration."* This directory is the beginning of that, and it is deliberately not a copy of anything in
-`reference/`.
+corroboration."* This directory is that implementation - it now meets section 11, and the argument is set out
+below - and it is deliberately not a copy of anything in `reference/`.
 
 ## What is here
 
 | File | What it is |
 | --- | --- |
-| `verify_claims.py` | The container, the claim, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 3, 5, 6, 7 and 12) rather than from `reference/`. No dependencies beyond the standard library. |
+| `verify_claims.py` | The container, the claim, the claim hash, the capture's document, the signature family, both anchors and the text fingerprint, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 3, 4.2, 4.5, 5, 6, 7, 8 and 12) rather than from `reference/`. No dependencies beyond the standard library. |
 | `container.py` | Reading a receipt's ZIP, the names inside it, and the WACZ capture it names - including the resource hashes the capture advertises for itself. |
 | `warc.py` | The record layer: the magic that separates records, the HTTP block, the WARC-Payload-Digest a record states for itself, and the body cut to the length the response declares. The smallest reader that can answer one question - what was the main document (section 4.2). |
 | `anchor.py` | Both anchor checks: the chain links of section 8.2, and the RFC 3161 tokens of section 8.3. |
@@ -58,7 +58,7 @@ python conformance/verify_claims.py ./kit          # exit 0 when nothing disagre
 ## The result
 
 ```
-claim hashes: 42 of 48 fixtures agree
+claim hashes: 45 of 49 fixtures agree
 3 refused, and the record says the same (a corroborated refusal, not a pass by silence)
 0 disagree
 ```
@@ -72,7 +72,7 @@ words extracted from the capture's document by the seven rules of section 4.5.1 
 refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not read),
 and the record agrees that they are refused.
 
-Every status each check can produce is exercised across those 48 fixtures: all four of `anchor.verified`
+Every status each check can produce is exercised across those 49 fixtures: all four of `anchor.verified`
 (`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, the `pass` and `fail` of the
 text fingerprint and its `not_applicable` when a claim carries none, and both the refusals and the stage gaps
 of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
@@ -81,6 +81,12 @@ nothing.
 The verdict fields are covered the same way: nine distinct combinations of `attribution`, `time_bound` and
 `capture_profile` across the fixtures, including a key the caller vouches for, one it does not, an anchor that
 verified and three declared capture profiles - and all three exit codes.
+
+**Every caller option the kit names now has a vector.** `trustedKeys`, `previousClaimHash` and `trustedTsa`
+already did; `keyDirectory` did not, and no implementation of it could be checked against anything. Adding one
+cost a case and found a real gap here: this implementation claimed `not_checked` for a caller who supplied a
+directory, because it did not read one - which is wrong in the direction that flatters nobody, since it reports
+a key as unvouched-for when the caller vouched for it. That is now implemented, and the vector agrees.
 
 ## What writing it found
 
@@ -176,7 +182,7 @@ of what it got wrong. Section 8.1 requires an anchorless claim to report `anchor
 `anchor.verified: not_checked` - an asymmetry that looks like a mistake until the reason is read ("there is
 nothing here to have a type" against "there was nothing to verify, and this receipt does not have a verified
 time"). It is stated, it is complete, and implementing it from the text alone reproduced all four statuses that
-check can produce, across 48 fixtures - including the `unsupported` an unknown type gets, which is the rule a
+check can produce, across 49 fixtures - including the `unsupported` an unknown type gets, which is the rule a
 naive implementation would get wrong by calling it a failure. Section 8 is the part of this specification a
 second implementer can follow without asking anybody anything.
 
@@ -190,7 +196,7 @@ Section 11 lists four conditions, and this implementation meets them:
    reached filled in as `not_checked` rather than omitted;
 2. **the status, level-rollup and `verified` rules of sections 7.1-7.5** - derived independently and compared,
    and agreeing;
-3. **the canonical form, byte for byte, including the refusals** - 45 of 48 fixtures agree, and the three
+3. **the canonical form, byte for byte, including the refusals** - 45 of 49 fixtures agree, and the three
    refusals are corroborated as refusals rather than passed over in silence;
 4. **the recorded verdicts** - comparing every rule-derived field, and agreeing on all nine distinct
    combinations of `attribution`, `time_bound` and `capture_profile` the fixtures contain.

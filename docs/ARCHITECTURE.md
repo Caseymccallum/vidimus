@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 48 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 49 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -735,17 +735,22 @@ signature is outside the signed subtree.
 
 Three decisions about how it was done, which matter more than what it covered:
 
-1. **Written from the specification, not from the reference.** The rules came from sections 5, 5.1, 5.2 and
-   6.1. Where the two disagreed, the disagreement was the finding rather than something to silently match -
-   and there were three of them, all now fixed in the specification (below).
-2. **One layer at a time, complete, and named as partial.** It implements all 21 checks of section 7.4 and
-   compares eight of the nine verdict fields, and says so in its own output; `conformance/README.md` states
-   that it must not be listed as a conforming implementation while the ninth - a caveat count, which it argues
-   may not belong in section 11 at all - is missing. A second implementation that quietly covered half the
-   table would be worse than none, because "agreement" would then mean less than it sounds like.
-3. **It reports what it did not reach, by name.** Four vectors stop at a gate (a fixture that is not a
-   container, a claim that does not parse, an unknown `spec_version`), and two are refused. Those are
-   counted and listed separately from the 39 that agree, because a conformance report that says "no
+1. **Written from the specification, not from the reference - for the layers where that was possible.** The
+   rules came from sections 3, 4.2, 4.5, 5, 6, 7, 8 and 12. Where the two disagreed, the disagreement was the
+   finding rather than something to silently match, and there were nine of them; six are now fixed in the
+   specification (below). Two layers - the WARC reader and the token verifier - were written with the reference
+   in view, because the rules they needed were not in the specification yet, and `conformance/README.md` says
+   what that costs.
+2. **One layer at a time, complete, and named as partial.** It implements all 21 checks of section 7.4, every
+   rule-derived field of the verdict, and the rollup rules - which is what section 11 asks for - and it says so
+   in its own output. The one field it does not produce is `caveat_count`, and section 11.1 says a conforming
+   run need not: a caveat is prose about something that was *not* established. A second implementation that
+   quietly covered half the table would be worse than none, because "agreement" would then mean less than it
+   sounds like.
+3. **It reports what it did not reach, by name.** Three vectors are refused outright (a float, a `-0`, a
+   version this implementation does not read), and the checks a stopped stage never reached are filled in as
+   `not_checked` rather than omitted - so every fixture has a status for every check, and the refusals are
+   counted and listed separately from the 46 that agree, because a conformance report that says "no
    disagreement" without saying what it never looked at is the exact failure mode this project is arranged
    against.
 
