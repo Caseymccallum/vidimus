@@ -23,6 +23,7 @@
 import { canonicalJson, buildReceipt, prettyJson, signer, stranger } from './fixtures.mjs';
 import { sha256, toBase64Url, utf8 } from './digest.mjs';
 import { textDigest } from './text.mjs';
+import { TSA_GEN_TIME, tsaCertificate, timestampToken } from './tst-fixture.mjs';
 import { FIXTURE_DATE, waczBytes, waczEntries, DEFAULT_HTML, SPEC_VERSION } from './fixtures.mjs';
 import { writeZip } from './zip.mjs';
 import { signMessage } from './signature.mjs';
@@ -501,9 +502,9 @@ export const CASES = [
     },
   },
   {
-    id: 'anchor-rfc3161-unimplemented',
-    description: 'a receipt carrying an RFC 3161 timestamp token',
-    proves: 'an anchor this implementation cannot validate is reported unsupported and caveated, and never counts as time established',
+    id: 'anchor-rfc3161-no-tsa',
+    description: 'a receipt carrying an RFC 3161 timestamp token, checked with no TSA pinned',
+    proves: 'a token is not validated against a list this project invented: with nothing pinned it is unsupported and caveated, and never counts as time established',
     build: () => buildReceipt({
       anchor: { type: 'rfc3161', token: 'MIIBogYJKoZIhvcNAQcCoIIBkzCCAY8CAQMxCzAJBgUrDgMCGgUAMIIB' },
     }).bytes,
@@ -512,6 +513,66 @@ export const CASES = [
       exit_code: 0,
       levels: { L0: 'pass', L1: 'pass', L2: 'unsupported', L3: 'not_applicable' },
       checks: { 'anchor.present': 'pass', 'anchor.verified': 'unsupported' },
+    },
+  },
+  {
+    id: 'anchor-rfc3161-verified',
+    description: 'a timestamp token that commits to this claim, signed by a TSA the caller pinned',
+    proves: 'the whole of section 8.3: the imprint is the claim hash, the certificate was valid when it stamped, it is a timestamping certificate, and the signature verifies - so L2 passes and the attested instant is reported as a bound',
+    build: () => {
+      // A token commits to the claim hash, and the claim hash has to exist first. An `rfc3161` anchor is
+      // *excluded* from the signed subtree - a token is a response to a digest, so it cannot precede the
+      // digest it answers - which is what makes this two-step build possible, and this case proves it in
+      // passing: the placeholder and the real token produce the same claim hash.
+      const provisional = buildReceipt({ anchor: { type: 'rfc3161', token: 'AA' } });
+      const token = timestampToken({ claimHash: provisional.claimHash, genTime: TSA_GEN_TIME });
+      return buildReceipt({ anchor: { type: 'rfc3161', token: toBase64Url(token) } }).bytes;
+    },
+    // Pinned by fingerprint, which is what a caller usually has to hand.
+    options: { trustedTsa: [sha256(tsaCertificate())] },
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'pass', L3: 'not_applicable' },
+      checks: { 'anchor.present': 'pass', 'anchor.verified': 'pass' },
+    },
+  },
+  {
+    id: 'anchor-rfc3161-wrong-imprint',
+    description: 'a timestamp token whose imprint is not this claim',
+    proves: 'a token that answers a different digest is a failure with both digests named, even though the signature over it is genuine: being signed by a TSA is not the same as being about this claim',
+    build: () => buildReceipt({
+      anchor: {
+        type: 'rfc3161',
+        // The shape of a token a TSA would never have produced for this claim.
+        token: toBase64Url(timestampToken({ imprint: '11'.repeat(32), genTime: TSA_GEN_TIME })),
+      },
+    }).bytes,
+    options: { trustedTsa: [sha256(tsaCertificate())] },
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'pass', L1: 'pass', L2: 'fail', L3: 'not_applicable' },
+      checks: { 'anchor.verified': 'fail' },
+    },
+  },
+  {
+    id: 'anchor-rfc3161-untrusted-tsa',
+    description: 'a timestamp token signed by a TSA the caller did not pin',
+    proves: 'an anchor from an authority the caller does not trust is not checked and not blamed: the receipt stays verified, L2 says not_checked, and the token\'s own fingerprint is named so the caller can pin it if they choose',
+    build: () => buildReceipt({
+      anchor: {
+        type: 'rfc3161',
+        token: toBase64Url(timestampToken({ claimHash: '22'.repeat(32), genTime: TSA_GEN_TIME, certificate: tsaCertificate({ commonName: 'Some Other TSA', serial: 7 }) })),
+      },
+    }).bytes,
+    options: { trustedTsa: [sha256(tsaCertificate())] },
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'anchor.verified': 'not_checked' },
+      caveats: 1,
     },
   },
   {

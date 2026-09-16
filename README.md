@@ -9,8 +9,8 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-144-3DA639)](#verify-the-claims-yourself)
-[![Vectors](https://img.shields.io/badge/vectors-38-3DA639)](spec/vectors/receipt-vectors.json)
+[![Tests](https://img.shields.io/badge/tests-153-3DA639)](#verify-the-claims-yourself)
+[![Vectors](https://img.shields.io/badge/vectors-41-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
 </div>
@@ -52,8 +52,8 @@ both facts true, both reported, neither hidden behind the other.
 > detect. [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) is the full list, ordered by how easy each
 > one is to misread.
 
-> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 144 tests,
-> 38 conformance vectors, no dependencies. The extension that will make a receipt in one click is the
+> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 153 tests,
+> 41 conformance vectors, no dependencies. The extension that will make a receipt in one click is the
 > next piece of work. The format had to be checkable before anything wrote it at scale.
 
 ## Feature Highlights
@@ -138,7 +138,7 @@ exists today:
   success;
 - a capture core that turns what a browser knows into a WACZ - browser-safe, and the module the
   extension will import rather than reimplement (`capture.mjs`);
-- 38 conformance vectors, rebuilt and re-hashed on every run;
+- 41 conformance vectors, rebuilt and re-hashed on every run;
 - six gates, run by `npm run verify` and by CI on Linux and Windows.
 
 The browser shell exists now too, in `extension/`: one button that seals the page you are reading,
@@ -183,7 +183,7 @@ Every claim in this README is a command, and every gate has been shown to be cap
 | The counts this README quotes are real | `npm run check:docs` |
 | Every check has been seen not passing | `npm test` — the coverage test fails if any of the 20 checks has only ever passed |
 | The recorded verdicts are current | `npm run vectors:check` — rebuilds every fixture and re-hashes it |
-| The verifier is honest about what it did not check | `node reference/src/cli.mjs verify spec/fixtures/anchor-rfc3161-unimplemented.receipt` |
+| The verifier is honest about what it did not check | `node reference/src/cli.mjs verify spec/fixtures/anchor-rfc3161-no-tsa.receipt` |
 | A tampered capture is caught | `node reference/src/cli.mjs verify spec/fixtures/capture-digest-mismatch.receipt` |
 | A re-serialised claim is refused | `node reference/src/cli.mjs verify spec/fixtures/claim-not-canonical.receipt` |
 
@@ -210,12 +210,16 @@ here because a format that cannot say what it grew out of is a format nobody can
 - **The browser shell.** `capture.mjs` turns a page's facts into a WACZ; what is missing is the
   extension that gathers those facts - the rendered DOM, the observed status and headers - calls the
   capture core, seals the receipt and keeps the key.
-- **RFC 3161 anchors** - a real timestamp from a third party. Specified in section 8.3, reported as
-  `unsupported`, not faked.
-- **`text-v1`**, the fingerprint that answers "did the page's words change". It needs an HTML engine,
-  so the CLI says `not_checked` and the extension will do it properly.
-- **Level 3**, the live comparison against the page as it is now. It needs the network, and this
-  verifier deliberately has none.
+- **A second implementation.** The conformance vectors pin one implementation's answers, which is
+  agreement rather than corroboration, and a second reading of the same vectors is the biggest single
+  gap. `CONTRIBUTING.md` says so first.
+- **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
+  check the text fingerprint and does not compare it with the document digest the claim states
+  (section 9 of the specification).
+- **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
+  document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
+- **Size limits** for untrusted input. Named in the specification and the threat model rather than
+  silently absent.
 - **Key directories** - who a key belongs to. Deliberately absent until there is a second
   implementation to disagree with about it.
 

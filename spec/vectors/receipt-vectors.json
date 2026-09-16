@@ -1335,11 +1335,11 @@
       }
     },
     {
-      "id": "anchor-rfc3161-unimplemented",
-      "description": "a receipt carrying an RFC 3161 timestamp token",
-      "proves": "an anchor this implementation cannot validate is reported unsupported and caveated, and never counts as time established",
+      "id": "anchor-rfc3161-no-tsa",
+      "description": "a receipt carrying an RFC 3161 timestamp token, checked with no TSA pinned",
+      "proves": "a token is not validated against a list this project invented: with nothing pinned it is unsupported and caveated, and never counts as time established",
       "fixture": {
-        "file": "anchor-rfc3161-unimplemented.receipt",
+        "file": "anchor-rfc3161-no-tsa.receipt",
         "sha256": "b64170a01ad355a81f15e247c1dee1290df084786424abd2344ebeef413420e1",
         "bytes": 2293
       },
@@ -1377,6 +1377,157 @@
         "caveat_count": 1,
         "checks": {
           "anchor.verified": "unsupported",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-rfc3161-verified",
+      "description": "a timestamp token that commits to this claim, signed by a TSA the caller pinned",
+      "proves": "the whole of section 8.3: the imprint is the claim hash, the certificate was valid when it stamped, it is a timestamping certificate, and the signature verifies - so L2 passes and the attested instant is reported as a bound",
+      "fixture": {
+        "file": "anchor-rfc3161-verified.receipt",
+        "sha256": "00373e65c1206454713af3e5205fcbbfb124facc9f8f4b4d370b54348f401000",
+        "bytes": 4075
+      },
+      "options": {
+        "trustedTsa": [
+          "b361926a2762af0a8c8b8f6d4d8f7ffe23271e60fcc4930e279f1e58552a248c"
+        ]
+      },
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "pass",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.present": "pass",
+          "anchor.verified": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "pass",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "anchored",
+        "caveat_count": 0,
+        "checks": {
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-rfc3161-wrong-imprint",
+      "description": "a timestamp token whose imprint is not this claim",
+      "proves": "a token that answers a different digest is a failure with both digests named, even though the signature over it is genuine: being signed by a TSA is not the same as being about this claim",
+      "fixture": {
+        "file": "anchor-rfc3161-wrong-imprint.receipt",
+        "sha256": "f8418f340eeedadae3c3922f62cb0efdad316a163c80d549e0f218d839a50686",
+        "bytes": 4075
+      },
+      "options": {
+        "trustedTsa": [
+          "b361926a2762af0a8c8b8f6d4d8f7ffe23271e60fcc4930e279f1e58552a248c"
+        ]
+      },
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "anchor.verified": "fail",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-rfc3161-untrusted-tsa",
+      "description": "a timestamp token signed by a TSA the caller did not pin",
+      "proves": "an anchor from an authority the caller does not trust is not checked and not blamed: the receipt stays verified, L2 says not_checked, and the token's own fingerprint is named so the caller can pin it if they choose",
+      "fixture": {
+        "file": "anchor-rfc3161-untrusted-tsa.receipt",
+        "sha256": "2862bfb34946d7cfc4215b0569ca86414882cee29d6e29058df52d64ab34c77c",
+        "bytes": 3967
+      },
+      "options": {
+        "trustedTsa": [
+          "b361926a2762af0a8c8b8f6d4d8f7ffe23271e60fcc4930e279f1e58552a248c"
+        ]
+      },
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "not_checked"
+        },
+        "caveats": 1
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
         }
       }

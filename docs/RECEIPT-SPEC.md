@@ -751,21 +751,42 @@ as "therefore real" is the mistake this format exists to prevent.
 
 A DER-encoded RFC 3161 timestamp token, base64url, whose message imprint is the claim hash.
 
-This is the only anchor that gives a stranger a *time*, and it is the one the reference
-implementation does not yet validate: it reports `anchor.present: pass`, `anchor.verified:
-unsupported`, and a caveat - and never a level pass (see `docs/CONFORMANCE.md`).
+This is the only anchor that gives a stranger a *time*, and it is the one anchor whose validation
+depends on **a certificate the caller pins**. There is no built-in list of timestamping authorities: a
+format that hard-codes trust roots is a format that rots (D-007). So:
 
-What a conforming implementation **MUST** do before reporting `pass`, written down now so that a
-half-implementation cannot answer "yes" too early:
+- **with a pinned TSA** the reference implementation performs all four steps below and reports `pass`,
+  `fail`, `not_checked` or `unsupported` according to what it found;
+- **with no pinned TSA** it reports `anchor.present: pass`, `anchor.verified: unsupported`, and a caveat
+  saying what was missing - because a token nobody was asked to trust has not been checked.
+
+What a conforming implementation **MUST** do before reporting `pass`, written down before any
+implementation existed so that a half-implementation cannot answer "yes" too early:
 
 1. Parse the CMS `SignedData` and validate the signature chain to a TSA the verifier is willing
-   to trust - that trust being the caller's configuration, not a built-in list.
+   to trust - that trust being the caller's configuration, not a built-in list. A caller pins a
+   certificate by supplying **its DER or its SHA-256 fingerprint**, and a token signed by anything else
+   is `not_checked` with the signer's fingerprint named: not a fault in the receipt, and not a pass.
+   The pinned certificate must *also* be a timestamping one: RFC 3161 requires the `timeStamping`
+   extended key usage, and a pinned certificate that lacks it is a `fail`, because a pin is not a
+   licence to skip the protocol.
 2. Check that the token's `messageImprint` equals the claim hash, under the same hash algorithm.
 3. Check the token's `genTime`, applying the documented rules for a TSA whose certificate was
-   valid only for part of that token's life.
+   valid only for part of that token's life. The rule this format states is that **`genTime` must fall
+   inside the signing certificate's validity window**, and that nothing here consults a revocation list
+   - so a certificate valid at the time may still have been revoked, and the verdict does not pretend
+   otherwise.
 4. Report the attested instant as `attested_before`. The honest phrasing is **"this claim
    existed no later than T"**, never "this page was captured at T": a timestamp bounds a claim
    from above, and it does not pin the capture to the instant the author wrote down.
+
+The two CMS bindings are also required, because without them a signature means nothing: the signed
+attributes must name the `TSTInfo` content type, and must carry the digest of the content they sign.
+
+**A token this verifier cannot read is reported as its own limit** - `unsupported`, with the reason -
+and never as a fault in the receipt (D-021). That includes a token using a signature algorithm, a digest
+algorithm, an imprint hash or a signer identification this implementation does not implement, all of
+which are listed in `docs/CONFORMANCE.md` rather than left to be discovered.
 
 ### 8.4 How time is reported
 
@@ -775,10 +796,11 @@ half-implementation cannot answer "yes" too early:
 | `time.bound` | `claimed_only` or `anchored`. |
 | `time.anchor_type` | The declared anchor type. |
 | `time.attested_before` | The instant an anchor attests the claim existed by, or `null`. |
+| `time.authority` | Who attested it, when the anchor named somebody. `null` otherwise. |
 
-`attested_before` is `null` in every verdict the reference implementation produces today, and
-that is deliberate: no anchor implementation here yields a time, and filling the field from
-`captured_at` would be precisely the conflation the field exists to prevent.
+`attested_before` is `null` unless an anchor **verified** in this run: a chain anchor attests ordering
+inside one archive rather than a time, and a token that was not validated attests nothing a verifier can
+report. Filling the field from `captured_at` would be precisely the conflation it exists to prevent.
 
 ## 9. What a verifier in 0.1 does not do
 

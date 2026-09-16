@@ -12,8 +12,11 @@ worth more than any amount of additional code.
    [`spec/vectors/receipt-vectors.json`](spec/vectors/receipt-vectors.json) would turn "the reference
    implementation agrees with itself" into corroboration. This is the biggest single gap (see
    `docs/CONFORMANCE.md`, section 6).
-2. **RFC 3161 anchor validation.** The specification is finished (section 8.3); the implementation is
-   the work, and it is bounded.
+2. **Token validation against a real authority.** Section 8.3 is implemented (`rfc3161.mjs`) and validated
+   against a TSA certificate the caller pins. What nobody has tried yet is a token from a real timestamping
+   authority: a certificate whose key is a chain rather than a pin, which is where the refusal to build
+   chains will meet reality for the first time - and where a real `<hash>` and signer identifier will test
+   the limits `docs/CONFORMANCE.md` lists.
 3. **A case that shows the verifier is wrong.** See above.
 4. **Users.** People who cite things for a living - librarians, journalists, law review editors,
    Wikipedia editors, researchers - telling us what their actual workflow is, especially where a
@@ -53,7 +56,7 @@ worth more than any amount of additional code.
 npm run verify                              # what CI runs: everything below, in order
 npm run syntax                              # every module parses
 npm run check:language                      # British English, enforced
-npm test                                    # 144 tests, no install
+npm test                                    # 153 tests, no install
 npm run check:docs                          # the counts the documentation quotes are real
 npm run vectors:generate                    # rebuild the fixtures to look at one
 node reference/src/cli.mjs verify spec/fixtures/capture-digest-mismatch.receipt

@@ -26,7 +26,7 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 144 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
+| `npm test` | 153 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. `--trusted-key` and `--key-directory` are how a caller answers "whose key is this?" (section 6.7 of the specification). |
@@ -78,7 +78,7 @@ Grouped by what they are for:
 | **The text fingerprint** | `text-fingerprint-wrong` - a claim whose fingerprint is plausible and not what its capture says. Kept because it was a real bug in this project's own fixture |
 | **The capture profile** | `capture-profile-declared`, `capture-profile-wire`, `capture-profile-unrecognised` - declared, reported, never judged |
 | **Signature** | `signature-from-another-claim`, `signature-key-id-mismatch`, `signature-algorithm-unsupported`, `signature-shape-broken` |
-| **Anchors** | `anchor-chain-head`, `anchor-chain-linked`, `anchor-chain-unlinked`, `anchor-chain-unfollowed`, `anchor-chain-head-with-predecessor`, `anchor-bolted-on`, `anchor-rfc3161-unimplemented`, `anchor-unknown-type` |
+| **Anchors** | `anchor-chain-head`, `anchor-chain-linked`, `anchor-chain-unlinked`, `anchor-chain-unfollowed`, `anchor-chain-head-with-predecessor`, `anchor-bolted-on`, `anchor-rfc3161-no-tsa`, `anchor-rfc3161-verified`, `anchor-rfc3161-wrong-imprint`, `anchor-rfc3161-untrusted-tsa`, `anchor-unknown-type` |
 | **Container** | `container-not-a-zip`, `container-with-stray-entry` |
 
 ## 5. Coverage rules, asserted by tests
@@ -101,7 +101,7 @@ Named here, with what each would take, so that none of them is mistaken for a de
 
 | Gap | Where it shows | What it would take |
 | --- | --- | --- |
-| **RFC 3161 anchors** | `anchor.verified: unsupported` | A CMS `SignedData` parser, chain validation against a caller-supplied TSA list, `messageImprint` comparison, and `genTime` handling. Section 8.3 of the specification already states the four steps required before a `pass` is allowed, so the work is bounded and the answer cannot be guessed at. |
+| **RFC 3161 anchors** | `anchor.verified` | **Implemented** against a TSA the caller pins (`--tsa`): content type and imprint, `genTime` inside the signing certificate's validity, the `timeStamping` extended key usage, and the signature over the `signedAttrs` as a `SET OF`. The limits are named rather than implied: no chain building to a root (a pin *is* an anchor, and a token signed by anything else is `not_checked` with its fingerprint reported), no revocation checking, and only RSA PKCS#1 v1.5 or ECDSA signatures with SHA-256, SHA-384 or SHA-512, SHA-256 imprints, SHA-256 content digests, and signers named by issuer and serial number. Anything outside that is `unsupported`, never `pass` and never `fail`. |
 | **`subject.document` is not re-derived** | `capture.wacz.resources` passes while the document digest is unchecked | The verifier re-reads a capture's document to check the text fingerprint, and does not compare it with `subject.document.sha256`. Comparing them is a new check rather than new code, so it needs a specification change and vectors - named in section 9 of the specification as a candidate for 0.2. |
 | **Level 3 (currency)** | L3 verifies the claim's own fingerprint; nothing compares a receipt with the live page | The comparison is specified (section 7.7 of the specification) and implemented as `vidimus check`: it verifies the receipt, fetches the URL, seals a second receipt for what the page says now, and prints a report with five outcomes - including "the bytes changed and the words did not". It never touches `verified`, and `--require-same-words` opts in to letting the comparison decide an exit code. |
 | **Size limits** | `container.readable` accepts any declared entry size | A cap applied before inflating, and a status for a receipt that exceeds it. Recorded as a limitation in the specification and the threat model so that it is not mistaken for a design choice. |

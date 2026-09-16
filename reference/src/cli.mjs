@@ -46,11 +46,13 @@ import { compareCurrency } from './currency.mjs';
 import { textDigest } from './text.mjs';
 import { KEY_DIRECTORY_KIND, readKeyDirectory } from './key-directory.mjs';
 import { citationFor, indexEntry } from './cite.mjs';
+import { readCertificate } from './x509.mjs';
+import { fromBase64, utf8 } from './encode.mjs';
 
 /** Every command, printed when the arguments do not make sense. */
 const USAGE = [
   'usage: vidimus verify  <file.receipt> [--json] [--trusted-key <hex>]... [--key-directory <file>]',
-  '                                      [--previous <hex>]',
+  '                                      [--tsa <certificate.pem|.der>]... [--previous <hex>]',
   '       vidimus inspect <file.receipt>',
   '       vidimus check   <file.receipt> [--json] [--key <key.json>] [--key-directory <file>]',
   '                       [--out <file.receipt>] [--force] [--timeout <seconds>] [--require-same-words]',
@@ -60,7 +62,7 @@ const USAGE = [
   '       vidimus keygen  [--out <key.json>] [--signer <name>] [--force]',
   '       vidimus keys    <directory.json>',
   '       vidimus cite    <file.receipt> [--json] [--title <text>] [--index <file>]',
-  '                                      [--key-directory <file>]',
+  '                                      [--key-directory <file>] [--tsa <certificate>]...',
 ];
 
 /**
@@ -117,7 +119,8 @@ function parseCite(rest) {
     const argument = rest[index];
     if (argument === '--json') {
       parsed.json = true;
-    } else if (argument === '--title' || argument === '--index' || argument === '--key-directory') {
+    } else if (argument === '--title' || argument === '--index' || argument === '--key-directory'
+               || argument === '--tsa') {
       const value = nextValue(rest, index, argument);
       if (value === null) return null;
       if (argument === '--key-directory') {
@@ -127,6 +130,10 @@ function parseCite(rest) {
           console.error(`${value}: could not be read as a key directory: ${error.message}`);
           return null;
         }
+      } else if (argument === '--tsa') {
+        const certificate = readTsaFile(value);
+        if (certificate === null) return null;
+        parsed.trustedTsa = [...(parsed.trustedTsa ?? []), certificate];
       } else {
         parsed[flagName(argument)] = value;
       }
@@ -170,14 +177,20 @@ function parseCheck(rest) {
       parsed.force = true;
     } else if (argument === '--require-same-words') {
       parsed.requireSameWords = true;
-    } else if (argument === '--key-directory') {
-      const value = nextValue(rest, index, '--key-directory');
+    } else if (argument === '--key-directory' || argument === '--tsa') {
+      const value = nextValue(rest, index, argument);
       if (value === null) return null;
-      try {
-        parsed.keyDirectory = readDirectoryFile(value);
-      } catch (error) {
-        console.error(`${value}: could not be read as a key directory: ${error.message}`);
-        return null;
+      if (argument === '--tsa') {
+        const certificate = readTsaFile(value);
+        if (certificate === null) return null;
+        parsed.trustedTsa = [...(parsed.trustedTsa ?? []), certificate];
+      } else {
+        try {
+          parsed.keyDirectory = readDirectoryFile(value);
+        } catch (error) {
+          console.error(`${value}: could not be read as a key directory: ${error.message}`);
+          return null;
+        }
       }
       index += 1;
     } else if (argument === '--key' || argument === '--out') {
@@ -247,6 +260,13 @@ function parseVerifyLike(command, rest) {
         console.error(`${value}: could not be read as a key directory: ${error.message}`);
         return null;
       }
+      index += 1;
+    } else if (argument === '--tsa') {
+      const value = nextValue(rest, index, '--tsa');
+      if (value === null) return null;
+      const certificate = readTsaFile(value);
+      if (certificate === null) return null;
+      options.trustedTsa = [...(options.trustedTsa ?? []), certificate];
       index += 1;
     } else if (argument.startsWith('--')) {
       console.error(`unknown option: ${argument}`);
@@ -368,6 +388,56 @@ function read(file) {
  */
 function readDirectoryFile(file) {
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(file)));
+}
+
+/**
+ * Read a TSA certificate: PEM, as a certificate authority publishes it, or DER.
+ *
+ * The verifier pins DER bytes, and the two forms are not interchangeable - so the conversion happens here,
+ * where a file lives, and never inside a verifier. The certificate is *parsed* rather than merely read,
+ * because a mistyped path that quietly became an empty list of trusted authorities would turn "I checked
+ * your anchor" into "I checked nothing", which is the failure this whole project is arranged against.
+ *
+ * @param {string} file
+ * @returns {Uint8Array | null} The DER, or null after saying why.
+ */
+function readTsaFile(file) {
+  let bytes;
+  try {
+    bytes = read(file);
+  } catch (error) {
+    console.error(`${file}: could not be read: ${error.message}`);
+    return null;
+  }
+
+  const pem = /-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/
+    .exec(new TextDecoder('utf-8').decode(bytes));
+  try {
+    const der = pem === null ? bytes : fromBase64(pem[1].replace(/\s+/g, ''));
+    readCertificate(der);
+    return der;
+  } catch (error) {
+    console.error(`${file}: is not a certificate this can read: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * The options a caller supplies to the verifier, gathered in one place.
+ *
+ * Three commands verify a receipt, and a second place where a trust decision is assembled is a second place
+ * for one to be forgotten.
+ *
+ * @param {Record<string, any>} options
+ * @returns {Record<string, any>}
+ */
+function verificationOptions(options) {
+  return {
+    ...(options.keyDirectory === undefined ? {} : { keyDirectory: options.keyDirectory }),
+    ...(options.trustedKeys === undefined ? {} : { trustedKeys: options.trustedKeys }),
+    ...(options.trustedTsa === undefined ? {} : { trustedTsa: options.trustedTsa }),
+    ...(options.previousClaimHash === undefined ? {} : { previousClaimHash: options.previousClaimHash }),
+  };
 }
 
 /**
@@ -656,10 +726,7 @@ async function fetchPage(url, seconds) {
 async function checkAgainstPage(options) {
   let verdict;
   try {
-    verdict = await verifyReceipt(
-      read(options.file),
-      options.keyDirectory === undefined ? {} : { keyDirectory: options.keyDirectory },
-    );
+    verdict = await verifyReceipt(read(options.file), verificationOptions(options));
   } catch (error) {
     console.error(`${options.file}: could not be read: ${error.message}`);
     return 2;
@@ -836,10 +903,7 @@ function listKeys(file) {
 async function citeReceipt(options) {
   let verdict;
   try {
-    verdict = await verifyReceipt(
-      read(options.file),
-      options.keyDirectory === undefined ? {} : { keyDirectory: options.keyDirectory },
-    );
+    verdict = await verifyReceipt(read(options.file), verificationOptions(options));
   } catch (error) {
     console.error(`${options.file}: could not be read: ${error.message}`);
     return 2;

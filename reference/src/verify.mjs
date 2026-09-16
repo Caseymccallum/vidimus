@@ -31,12 +31,27 @@
  */
 
 import { canonicalise, assertCanonicalBytes, CanonicalJsonError } from './canonical.mjs';
-import { fromBase64Url, isSha256Hex, utf8 } from './encode.mjs';
+import { fromBase64Url, isSha256Hex, toHex, utf8 } from './encode.mjs';
+import { sha256 } from './sha256.mjs';
 import { textDigest } from './text.mjs';
 import { lookUpKey, readKeyDirectory, validityAt } from './key-directory.mjs';
+import { tokenBytes, verifyToken } from './rfc3161.mjs';
 import {
   ED25519_ALG, SPEC_VERSION, claimHashOf, signedSubtree, signingMessage,
 } from './claim.mjs';
+
+/**
+ * A synchronous SHA-256, which is what the token layer asks for.
+ *
+ * Not `runtime.digest`: that may be asynchronous, and the token reader is a pure function of bytes. Both
+ * runtimes have this project's own SHA-256, pinned against the platform's by a test.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function digestOf(bytes) {
+  return toHex(sha256(bytes));
+}
 
 /**
  * Re-exported from `claim.mjs`, where they live because a producer needs them and the verifier does not
@@ -166,7 +181,7 @@ export async function verifyReceipt(bytes, options = {}) {
   } else {
     await verifySignature(state, options, runtime);
     recordGaps(state, 'L1', gapReason(state, 'L1'));
-    verifyAnchor(state, options);
+    await verifyAnchor(state, options, runtime);
     recordGaps(state, 'L2', gapReason(state, 'L2'));
     await verifyText(state, runtime);
     recordGaps(state, 'L3', gapReason(state, 'L3'));
@@ -294,9 +309,11 @@ export async function verifyReceipt(bytes, options = {}) {
       claimed: state.time.claimed,
       bound: anchored ? 'anchored' : 'claimed_only',
       anchor_type: typeof manifest?.anchor?.type === 'string' ? manifest.anchor.type : 'none',
-      // Always null in v0.1: no anchor implementation here produces a time, and inventing
-      // one from the claim would be exactly the conflation this field exists to prevent.
-      attested_before: null,
+      // What an anchor attests: the instant the claim is known to have existed *by*, and who said so. Null
+      // when nothing verified, because a time nobody attested is not a bound (section 8.4). Filling this
+      // from `captured_at` would be exactly the conflation the field exists to prevent.
+      attested_before: state.time.attestedBefore,
+      authority: state.time.authority,
     },
     caveats: state.caveats,
     summary: summarise(state, statuses),
@@ -476,7 +493,7 @@ function newState() {
     keyId: null,
     trust: 'not_checked',
     directoryEntry: null,
-    time: { claimed: null, bound: 'claimed_only', authority: null },
+    time: { claimed: null, bound: 'claimed_only', authority: null, attestedBefore: null },
   };
 }
 
@@ -844,15 +861,16 @@ function readDirectoryOption(options, state) {
  * author's own statement, and the level is reported `not_checked` so that "captured on
  * the 15th" never reads as "proven to have been captured on the 15th".
  *
- * `rfc3161` is specified but deliberately reported `unsupported` by this implementation.
- * A CMS/RFC 3161 token parser is real work, and a half-implementation that answers
- * `pass` for tokens it did not fully check would be worse than an honest refusal.
- * `docs/CONFORMANCE.md` records it as the first thing a v0.2 implementer should pick up.
+ * `rfc3161` is validated against a TSA certificate the *caller* pins (section 8.3), and reports
+ * `unsupported` when no such certificate was given: there is no built-in list of authorities, because a
+ * format that hard-codes trust roots is a format that rots (D-007).
  *
  * @param {VerificationState} state
- * @param {{ previousClaimHash?: string }} options
+ * @param {{ previousClaimHash?: string, trustedTsa?: Uint8Array[] }} options
+ * @param {Record<string, any>} runtime
+ * @returns {Promise<void>}
  */
-function verifyAnchor(state, options) {
+async function verifyAnchor(state, options, runtime) {
   const manifest = /** @type {Record<string, any>} */ (state.manifest);
   const anchor = manifest.anchor;
 
@@ -918,9 +936,55 @@ function verifyAnchor(state, options) {
 
   if (anchor.type === 'rfc3161') {
     record(state, 'anchor.present', 'pass');
-    record(state, 'anchor.verified', 'unsupported',
-      'this verifier does not implement RFC 3161 token validation, so the anchor was not checked');
-    state.caveats.push('an RFC 3161 anchor is present but unverified by this implementation');
+
+    const pinned = Array.isArray(options.trustedTsa) ? options.trustedTsa : [];
+    if (pinned.length === 0) {
+      // The token is present and well-formed for all this verifier knows; what is missing is a trust
+      // anchor, which is the caller's to supply (section 8.3 of the specification).
+      record(state, 'anchor.verified', 'unsupported',
+        'this verifier validates a token against a TSA certificate the caller pins, and none was pinned');
+      state.caveats.push(
+        'an RFC 3161 anchor is present and was not validated: no TSA certificate was pinned to validate '
+        + 'it against',
+      );
+      return;
+    }
+    if (state.claimHash === null) {
+      record(state, 'anchor.verified', 'not_checked', 'the claim hash could not be computed');
+      return;
+    }
+
+    let token;
+    try {
+      token = tokenBytes(anchor.token);
+    } catch (error) {
+      record(state, 'anchor.verified', 'unsupported', `${error.message}, so it was not checked`);
+      return;
+    }
+
+    const outcome = await verifyToken({
+      token,
+      claimHash: state.claimHash,
+      trustedTsa: pinned,
+      digestOf,
+      runtime,
+    });
+
+    if (outcome.outcome === 'verified') {
+      record(state, 'anchor.verified', 'pass', outcome.detail);
+      // "Existed no later than", which is what a timestamp attests - never "captured at" (section 8.3).
+      state.time.attestedBefore = outcome.genTime;
+      state.time.authority = outcome.authority;
+      return;
+    }
+
+    const status = outcome.outcome === 'invalid'
+      ? 'fail'
+      : (outcome.outcome === 'untrusted_signer' ? 'not_checked' : 'unsupported');
+    record(state, 'anchor.verified', status, outcome.detail);
+    if (status !== 'fail') {
+      state.caveats.push(`an RFC 3161 anchor is present and was not validated: ${outcome.detail}`);
+    }
     return;
   }
 
@@ -1088,6 +1152,14 @@ export function summarise(state, levels) {
   lines.push(signature !== null
     ? `signed by key ${state.keyId ?? signature.key_id}${signature.signer ? ` (${signature.signer})` : ''}`
     : 'unsigned: this claim is attributed to nobody');
+  if (state.time.attestedBefore !== null) {
+    // "No later than", because that is what a timestamp establishes - and never "captured at", which is a
+    // different and stronger statement (section 8.3).
+    lines.push(
+      `notarised: this claim existed no later than ${state.time.attestedBefore}`
+      + `${state.time.authority === null ? '' : `, per ${state.time.authority}`}`,
+    );
+  }
   if (state.trust === 'untrusted') lines.push('the signing key is not in the keys you trust');
   if (state.directoryEntry !== null) {
     const whom = state.directoryEntry.name ?? state.directoryEntry.email ?? '(unnamed in the directory)';

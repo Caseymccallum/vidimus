@@ -25,6 +25,10 @@ warc.mjs        a strict, narrow WARC reader: pure, with its inflater and digest
 wacz.mjs        finding the WARC inside a WACZ, for either runtime
 warc-node.mjs   the record layer with Node's inflater and the project's SHA-256 supplied
 text.mjs        `text-v1`: the words a reader would see, extracted deterministically from bytes
+der.mjs         ASN.1 DER: strict enough to read an untrusted token, and enough to mint a fixture
+x509.mjs        the certificate subset an RFC 3161 anchor needs, and no more
+rfc3161.mjs     a timestamp token: the four steps of section 8.3, and the CMS bindings they rest on
+tst-fixture.mjs a published, worthless TSA and its deterministic tokens, for the vectors
 capture.mjs     what a browser knows, turned into a WACZ - browser-safe, and the extension's entry point
 verify.mjs      the verifier: the check table, the stages, the verdict, the levels
 seal.mjs        the producer: a capture in, a signed receipt out
@@ -547,6 +551,53 @@ document's byte range and an incremental update, neither of which exists here - 
 viewer can verify would look like evidence while being a file next to a document. Named in section 13 of the
 specification with what it would take, and the sidecar pattern (a `.receipt` beside the file, an index line
 in the repository) covers the need honestly in the meantime.
+
+### D-029 - An RFC 3161 anchor is validated against a certificate the caller pins
+
+Section 8.3 was written before any implementation existed, listing four things a verifier must do before it
+may answer `pass`. This is that list, implemented, plus the two decisions the list left open.
+
+**Trust is a pin, not a chain.** RFC 3161 says to validate the signature "to a TSA the verifier is willing
+to trust", and the narrowest honest reading of that is a certificate the caller supplied - by DER or by
+SHA-256 fingerprint. There is no built-in authority list, and no chain building to a root: a pin *is* an
+anchor, so a token signed by anything else is `not_checked` with the signer's fingerprint reported, which is
+the same shape as `key_trusted` and for the same reason (D-007). Anything else would mean choosing a
+bundle, shipping it, and owning its expiry.
+
+**A pin does not suspend the protocol.** A certificate the caller trusts still has to *be* a timestamping
+certificate: RFC 3161 requires the `timeStamping` extended key usage, and its key usage has to permit
+signing. A pinned certificate that fails either is a `fail`, not a shrug - the pin says "believe these
+bytes", not "believe anything they sign".
+
+Three smaller decisions:
+
+1. **`genTime` must fall inside the signing certificate's validity window**, and nothing consults a
+   revocation list. Both halves are stated in the specification, because a verifier that implied "valid
+   certificate" while checking no revocation would be answering a question it was not asked.
+2. **Four outcomes, not two.** `verified` and `invalid` are the answers; `untrusted_signer` and
+   `unreadable` are the *verifier's* position, and they map to `not_checked` and `unsupported` - so a
+   token this code cannot read, or an algorithm it does not implement, never becomes a fault in somebody's
+   receipt (D-021).
+3. **The two CMS bindings are checked**, because a signature over attributes that describe nothing verifies
+   perfectly: the signed attributes must name the `TSTInfo` content type and carry the digest of the content
+   they sign. The token's signature is checked over the attributes re-tagged as `SET OF`, which is the one
+   detail everybody gets wrong once.
+
+**The fixture is a published, worthless key.** The vectors need a token, and a fixture has to be a
+deterministic function of committed bytes: RSA PKCS#1 v1.5 signing is deterministic, so a token minted from
+fixed values is byte-identical everywhere (D-014). The key lives in `tst-fixture.mjs` with a common name
+that says what it is, for the same reason the Ed25519 seeds already did. The certificate it signs is
+self-signed with no chain, which is exactly what a fixture should be and exactly what a real TSA should not.
+
+Two things this work found, both worth recording:
+
+- **A DER reader bug**, caught by the fixture before a single vector existed: `tag` held the low five bits
+  of the first byte, so `SEQUENCE` (`0x30`) read as `0x10`. Every universal primitive tag happens to have
+  the same low five bits as its whole byte, which is why the bug survived the first three tests; the
+  constructed tags are where it shows, and the typedef now says so in as many words.
+- **`keyUsage` is a `BIT STRING`**, so its first content byte is the count of unused trailing bits rather
+  than the bits themselves. Reading it one byte early is how a certificate that permits signing reports
+  itself as forbidding it.
 
 ## 3. What this implementation deliberately does not have
 

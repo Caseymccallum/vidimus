@@ -26,6 +26,7 @@
  */
 
 import { gunzipSync } from 'node:zlib';
+import { createPublicKey, verify } from 'node:crypto';
 
 import { sha256 } from './digest.mjs';
 import { keyId, verifyMessage } from './signature.mjs';
@@ -66,4 +67,21 @@ export const nodeRuntime = {
     const plain = decompress(warc.bytes, (bytes) => new Uint8Array(gunzipSync(bytes)));
     return findMainDocument(plain, url, { digest: (bytes) => sha256(bytes) });
   },
+
+  /**
+   * Check a signature made with a certificate's key, which is what an RFC 3161 token carries.
+   *
+   * Node imports a `SubjectPublicKeyInfo` directly and wants an ECDSA signature in DER, which is the form
+   * CMS already uses - so this is a one-liner here, and the *browser's* version has the conversion to do.
+   * That asymmetry is why the primitive takes the signature exactly as the token carried it.
+   *
+   * @param {{ spki: Uint8Array, hash: string, data: Uint8Array, signature: Uint8Array }} input
+   * @returns {boolean}
+   */
+  verifyWithPublicKey: ({ spki, hash, data, signature }) => verify(
+    hash,
+    data,
+    createPublicKey({ key: spki, format: 'der', type: 'spki' }),
+    signature,
+  ),
 };
