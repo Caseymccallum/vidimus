@@ -80,8 +80,9 @@ misread them:
 
 - **The page cannot affect the receipt.** Nothing in this project reads or touches a live page; a
   receipt is made from a capture that already happened. The verifier performs no network request at
-  all, and a test scans its source for `fetch`, file access, `Date.now()` and `Math.random` to keep
-  that true rather than merely intended.
+  all, and a test walks its import graph from `verify.mjs` looking for `fetch`, file access, `Date.now()`
+  and `Math.random` - so a module is covered the day it is imported, rather than the day somebody
+  remembers to add it to a list.
 - **A receipt cannot affect anything.** It is bytes. Nothing here blocks, redirects, rewrites or
   observes a request.
 - **The verifier never trusts the claim for anything it can compute.** Digests, key ids, lengths, hashes

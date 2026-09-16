@@ -32,6 +32,44 @@ import { sha256 } from '../src/digest.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = (name) => readFileSync(join(here, '..', 'src', name), 'utf8');
 
+/**
+ * Code without its comments, because prose is allowed to *mention* `fetch`.
+ *
+ * The same lesson the browser-safety gate records: a sentence documenting a rule must not break the check
+ * that enforces it.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function withoutComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+/**
+ * Every module of the verifier's rules, **reached** from its entry point rather than listed.
+ *
+ * A list of file names is a promise that decays: five modules joined this verifier while the purity test
+ * still named two of them, and a test that says "the verifier is scanned" while scanning a third of it is
+ * worse than no test at all. `browser-safety.test.mjs` walks a graph for exactly this reason.
+ *
+ * @param {string} entry A module name in `reference/src`.
+ * @returns {string[]}
+ */
+function reachableFrom(entry) {
+  const seen = [];
+  const queue = [entry];
+  while (queue.length > 0) {
+    const name = queue.shift();
+    if (seen.includes(name)) continue;
+    seen.push(name);
+    const text = withoutComments(source(name));
+    for (const match of text.matchAll(/from\s+'(\.[^']+)'/g)) {
+      queue.push(match[1].replace(/^\.\//, ''));
+    }
+  }
+  return seen;
+}
+
 /** Every case, built once, with its verdict. */
 const built = CASES.map((testCase) => ({
   id: testCase.id,
@@ -148,10 +186,13 @@ test('the summary never says a level is verified unless it is', async () => {
 });
 
 test('the verifier does not reach outside the bytes it was handed', async () => {
-  // The same shape of gate Sentinel runs over its source and its bundle: the claim "this
-  // checks nothing over the network and reads no clock" is enforced by scanning the code,
-  // not by intending it. `digest.mjs` and `signature.mjs` are excluded because they import
-  // `node:crypto` on purpose - and nothing else is.
+  // The same shape of gate Sentinel runs over its source and its bundle: the claim "this checks nothing
+  // over the network and reads no clock" is enforced by scanning the code, not by intending it.
+  //
+  // The scan walks the import graph from `verify.mjs` rather than a list of file names, because a list of
+  // file names is a promise that decays: five modules have been added to this verifier since the list was
+  // written, and every one of them would have been unscanned by a test that still said "the verifier is
+  // scanned". `browser-safety.test.mjs` walks a graph for the same reason.
   const forbidden = [
     'fetch(',
     'XMLHttpRequest',
@@ -165,9 +206,22 @@ test('the verifier does not reach outside the bytes it was handed', async () => 
     'Math.random',
     'process.env',
   ];
-  for (const module of ['verify.mjs', 'canonical.mjs']) {
-    const text = source(module);
+
+  // Exceptions are per module *and* per pattern, with the reason written down, so an exception cannot
+  // quietly widen into an unscanned file.
+  const allowed = new Map([
+    ['claim.mjs', new Map([['new Date(', 'it formats a timestamp the claim already carries, and reads no clock']])],
+    ['zip-write.mjs', new Map([['new Date(', 'it is `new Date(Date.UTC(2026, 0, 1))`, a fixed date so that a plan written twice has identical bytes']])],
+  ]);
+
+  const modules = reachableFrom('verify.mjs');
+  assert.ok(modules.length > 5, 'the graph should have grown past a stub');
+
+  for (const module of modules) {
+    const text = withoutComments(source(module));
     for (const pattern of forbidden) {
+      const why = allowed.get(module)?.get(pattern);
+      if (why !== undefined) continue;
       assert.ok(
         !text.includes(pattern),
         `${module} mentions "${pattern}": the verifier must stay pure`,
