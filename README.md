@@ -9,7 +9,7 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-153-3DA639)](#verify-the-claims-yourself)
+[![Tests](https://img.shields.io/badge/tests-160-3DA639)](#verify-the-claims-yourself)
 [![Vectors](https://img.shields.io/badge/vectors-41-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
@@ -53,7 +53,7 @@ both facts true, both reported, neither hidden behind the other.
 > one is to misread.
 
 > **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
-> browser extension: 153 tests, 41 conformance vectors, no dependencies. The format is checkable and is
+> browser extension: 160 tests, 41 conformance vectors, no dependencies. The format is checkable and is
 > being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
 > left to be discovered.
 
@@ -217,8 +217,6 @@ here because a format that cannot say what it grew out of is a format nobody can
   (section 9 of the specification).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
-- **Size limits** for untrusted input. Named in the specification and the threat model rather than
-  silently absent.
 
 ## Citing it
 

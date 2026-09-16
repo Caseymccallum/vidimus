@@ -42,6 +42,22 @@ export { crc32, ZipError } from './zip-common.mjs';
 export { dosDateTime, writeZip } from './zip-write.mjs';
 
 /**
+ * A refusal that is this reader's limit rather than a fault in the file.
+ *
+ * The distinction is the one D-021 draws everywhere else: a receipt too large for *this* implementation is
+ * not a broken receipt, and a verdict that said `fail` would blame the wrong party. `code: 'unsupported'`
+ * is how a runtime says "this is beyond me" instead.
+ *
+ * @param {string} message
+ * @returns {Error & { code: string }}
+ */
+function beyondLimit(message) {
+  const error = /** @type {Error & { code: string }} */ (new ZipError(message));
+  error.code = 'unsupported';
+  return error;
+}
+
+/**
  * Locate the end-of-central-directory record, the only place a ZIP can be read from
  * forwards. Scans back at most 64 KiB + 22 bytes, the largest an EOCD with a comment
  * is allowed to be.
@@ -138,7 +154,16 @@ function readCentralDirectory(bytes) {
  * receipt verifier's whole job is to notice that bytes are not what they claim to be.
  * A container that fails its own CRC never reaches the layer above.
  *
+ * **The limits are applied before anything is inflated**, and then again while it is. Both halves are
+ * needed: checking the declared size costs nothing and refuses the honest bomb, and passing a ceiling to
+ * the inflater is what refuses one whose declaration lies - a few kilobytes of deflate can expand to
+ * gigabytes, and a reader that only read the declaration would allocate them before noticing.
+ *
  * @param {Uint8Array} bytes
+ * @param {{ maxEntryBytes?: number, maxTotalBytes?: number, maxEntries?: number }} [limits]
+ *   Absent means no ceiling, which is what a caller reading *its own* file wants: a producer sealing a
+ *   capture the user chose is not defending against that user. A verifier reading somebody else's receipt
+ *   passes limits, and `verify.mjs` is where the numbers live.
  * @returns {{
  *   entries: Map<string, Uint8Array>,
  *   order: string[],
@@ -147,8 +172,18 @@ function readCentralDirectory(bytes) {
  * }}
  * @throws {ZipError}
  */
-export function readZip(bytes) {
+export function readZip(bytes, limits = {}) {
+  const maxEntryBytes = limits.maxEntryBytes ?? Infinity;
+  const maxTotalBytes = limits.maxTotalBytes ?? Infinity;
+  const maxEntries = limits.maxEntries ?? Infinity;
+
   const headers = readCentralDirectory(bytes);
+  if (headers.length > maxEntries) {
+    throw beyondLimit(
+      `this archive lists ${headers.length} entries, and this reader stops at ${maxEntries}`,
+    );
+  }
+
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   /** @type {Map<string, Uint8Array>} */
   const entries = new Map();
@@ -156,10 +191,18 @@ export function readZip(bytes) {
   const crcs = new Map();
   /** @type {string[]} */
   const order = [];
+  let total = 0;
 
   for (const header of headers) {
     if ((header.flags & 0x0001) !== 0) {
       throw new ZipError(`"${header.name}" is encrypted, which this reader does not support`);
+    }
+    // Refused *before* the bytes are touched: a bomb that says how large it is never gets to try.
+    if (header.uncompressedSize > maxEntryBytes) {
+      throw beyondLimit(
+        `"${header.name}" declares ${header.uncompressedSize} bytes, and this reader inflates at most `
+        + `${maxEntryBytes} of one entry`,
+      );
     }
     if (view.getUint32(header.localOffset, true) !== LOCAL_HEADER) {
       throw new ZipError(`local header for "${header.name}" has a bad signature`);
@@ -182,8 +225,22 @@ export function readZip(bytes) {
       contents = raw.slice();
     } else if (header.method === 8) {
       try {
-        contents = new Uint8Array(inflateRawSync(raw));
+        // `maxOutputLength` is the ceiling that matters: it stops the inflater mid-stream rather than
+        // after the allocation, so a declaration that lies does not get to allocate first. Node rejects an
+        // infinite one, so "no ceiling" means omitting the option rather than passing one.
+        contents = new Uint8Array(inflateRawSync(
+          raw,
+          maxEntryBytes === Infinity ? undefined : { maxOutputLength: maxEntryBytes },
+        ));
       } catch (error) {
+        // A declaration that lied: the inflater stopped at the ceiling, which is this reader's limit
+        // rather than a fault in the archive - the archive is doing exactly what a bomb does.
+        if (/** @type {any} */ (error).code === 'ERR_BUFFER_TOO_LARGE') {
+          throw beyondLimit(
+            `"${header.name}" expands past the ${maxEntryBytes} bytes this reader will inflate, whatever `
+            + 'its declaration says',
+          );
+        }
         throw new ZipError(`"${header.name}" could not be inflated: ${error.message}`);
       }
     } else {
@@ -199,6 +256,14 @@ export function readZip(bytes) {
     }
     if (crc32(contents) !== header.crc) {
       throw new ZipError(`"${header.name}" failed its CRC-32 check`);
+    }
+
+    total += contents.length;
+    if (total > maxTotalBytes) {
+      throw beyondLimit(
+        `this archive holds more than the ${maxTotalBytes} bytes of uncompressed content this reader `
+        + 'will keep in memory at once',
+      );
     }
 
     if (entries.has(header.name)) {

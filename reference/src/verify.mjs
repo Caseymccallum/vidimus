@@ -117,6 +117,28 @@ export const LEVELS = [
 export const CLAIM_HASH_FIELD = 'claim_hash';
 
 /**
+ * What this verifier will inflate, decided **before** it inflates anything.
+ *
+ * A receipt is untrusted input, and both of its layers expand: a `.receipt` is a ZIP, the WACZ inside it is
+ * another ZIP, and the WARC inside *that* is gzipped - so a few kilobytes can ask for gigabytes. Nothing in
+ * the format says how large a receipt may be, which makes this a property of the implementation rather
+ * than of the file, and that is why exceeding it is reported `unsupported` with the number named rather
+ * than as a fault in somebody's receipt (D-021).
+ *
+ * The numbers are generous on purpose: the extension will not capture more than 8 MB of page, so a 64 MB
+ * entry is a receipt nobody has a reason to write. A caller that needs more can raise them - they are
+ * passed to the runtime, which is where the bytes actually are.
+ */
+export const LIMITS = {
+  /** One entry, uncompressed. Checked against the declaration *and* enforced against what arrives. */
+  maxEntryBytes: 64 * 1024 * 1024,
+  /** Everything one container holds, uncompressed. */
+  maxTotalBytes: 256 * 1024 * 1024,
+  /** How many entries a container may list. A receipt has a handful; a WACZ has a few hundred. */
+  maxEntries: 4096,
+};
+
+/**
  * @param {unknown} value
  * @returns {value is Record<string, any>}
  */
@@ -528,7 +550,7 @@ function record(state, id, status, reason) {
 async function verifyContainer(bytes, state, runtime) {
   let archive;
   try {
-    archive = await runtime.readContainer(bytes);
+    archive = await runtime.readContainer(bytes, LIMITS);
   } catch (error) {
     // A runtime is allowed to declare a limit rather than a verdict. An error carrying
     // `code: 'unsupported'` means this verifier cannot read *this kind* of container, which is a gap in
@@ -667,9 +689,14 @@ async function verifyCapture(state, runtime) {
 
   let inner;
   try {
-    inner = await runtime.readContainer(captureBytes);
+    inner = await runtime.readContainer(captureBytes, LIMITS);
   } catch (error) {
-    record(state, 'capture.wacz.readable', 'fail', `the capture is not a readable WACZ: ${error.message}`);
+    // The same rule as the container above it: a capture this runtime cannot read - because it is ZIP64, or
+    // encrypted, or larger than this verifier will inflate - is a gap in the verifier rather than a fault
+    // in the receipt, and saying `fail` about it would be a lie in the safer direction (D-021).
+    const unsupported = /** @type {any} */ (error).code === 'unsupported';
+    record(state, 'capture.wacz.readable', unsupported ? 'unsupported' : 'fail',
+      `the capture is not a readable WACZ: ${error.message}`);
     return false;
   }
   record(state, 'capture.wacz.readable', 'pass');
@@ -1031,7 +1058,7 @@ async function verifyText(state, runtime) {
 
   let document;
   try {
-    document = await runtime.mainDocument(captureBytes, manifest.subject.url);
+    document = await runtime.mainDocument(captureBytes, manifest.subject.url, LIMITS);
   } catch (error) {
     // A capture whose WARC this reader will not read is not a capture that failed a test. Reporting it as
     // a failure would be the safer lie, and still a lie (D-021).

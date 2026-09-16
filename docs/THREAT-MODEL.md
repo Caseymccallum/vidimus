@@ -36,6 +36,9 @@ reports which parts of the claim held up.
 - **Its own report overstating what it found.** Every check appears in every verdict, a level
   passes only when every check in it passes, and an unknown is never a pass (D-005). This is the
   threat this project takes most seriously, because it is the one the user cannot see.
+- **Being asked for the machine's memory.** A hostile receipt can declare a gigabyte in a kilobyte, which
+  is why a verifier decides what it will inflate before it inflates anything and enforces that ceiling
+  while inflating (section 7.8). A limit reached is reported as this verifier's, not as the receipt's.
 
 ## 3. What it does not protect against
 
@@ -120,8 +123,11 @@ misread them:
 - **A chain anchor's claim about its own position.** `sequence: 1` always passes, because "this is
   the first receipt" is unfalsifiable from one receipt. It is a complete statement and a weak one.
 - **Timestamps to the second.** Two captures within the same second are indistinguishable by time.
-- **Sizes are not capped.** A hostile receipt can declare a large entry and ask a verifier to
-  inflate it. Callers reading untrusted receipts should cap what they will open (section 9).
+- **Running out of memory.** A receipt is untrusted input and both of its layers expand, so a verifier
+  caps what it will inflate - before inflating it, and again while inflating it, because a declaration is
+  not evidence. A receipt past the ceiling is `unsupported` with the number in the reason (section 7.8).
+  This is a protection against a *hostile* receipt, not against a large one: the limits are larger than
+  anything this project's own producer can write.
 - **The vectors prove agreement, not correctness.** They pin the reference implementation's answers,
   including the answers that rest on a decision somebody had to argue for. The arguments are in
   `docs/ARCHITECTURE.md` and in the specification, and reasonable people can disagree with them.

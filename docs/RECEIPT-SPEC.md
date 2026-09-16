@@ -29,10 +29,9 @@ A draft, and the version number says so. The reference implementation in `refere
 in `spec/vectors/receipt-vectors.json` are the record of what it answers, and
 `npm run verify` re-derives that record on every run.
 
-Two things are deliberately unfinished and named rather than implied: size limits for untrusted input
-and a claim that spans several URLs. `docs/CONFORMANCE.md` lists them alongside what each would take.
-Everything this document describes is implemented, including the anchors, the text fingerprint and the
-comparison with the page as it is now.
+One thing named in section 13 is not implemented - a claim that spans several URLs - along with the two
+implementation limits `docs/CONFORMANCE.md` lists. Everything else this document describes is implemented,
+including the anchors, the text fingerprint and the comparison with the page as it is now.
 
 ## 1. Scope
 
@@ -706,6 +705,26 @@ at the moment of the comparison rather than taking the report's word for it. `--
 the comparison, rather than the receipt, decide the exit code, and it is opt-in so that a comparison can
 never happen - or fail a build - by accident.
 
+### 7.8 What a verifier will inflate
+
+A receipt is untrusted input, and both of its layers expand: a `.receipt` is a ZIP, the WACZ inside it is
+another ZIP, and the WARC inside *that* is gzipped. A few kilobytes can therefore ask a verifier for
+gigabytes, and a verifier that allocates whatever a file asks for is a denial of service wearing the
+costume of a check.
+
+1. A verifier **MUST** apply a ceiling **before** it inflates anything, refusing an entry whose declared
+   size exceeds it. A declaration is not evidence, so it **MUST** also enforce that ceiling *while*
+   inflating - which is the difference between refusing a bomb and surviving one.
+2. Exceeding a ceiling is reported `unsupported`, never `fail`, and the reason names the limit. A receipt
+   being larger than this implementation will open is a fact about the implementation, not a fault in
+   somebody's receipt (D-021, D-030).
+3. **This document states no maximum.** The numbers are the implementation's, and a caller **MAY** raise
+   them: a format that fixes a size spends the rest of its life explaining why.
+
+The reference implementation uses 64 MB for one entry, 256 MB across a container and 4096 entries. All
+three are larger than anything its own producer can write, because a limit that refused every receipt this
+project makes would be a bug with a number attached.
+
 ## 8. Time anchors
 
 An anchor is evidence, produced by something other than the author, that the claim hash existed
@@ -817,7 +836,7 @@ a limitation somebody will assume away.
 | RFC 3161 token validation | `anchor.verified` | **Done**, against a TSA the caller pins (section 8.3). What is still not done is named there and in `docs/CONFORMANCE.md`: no chain building to a root, no revocation checking, and a stated list of algorithms. |
 | Level 3 (currency) | `subject.text`, and the report in section 7.7 | The verifier checks the claim's own fingerprint (section 4.5) and never fetches anything. Whether the page still says the same words is a comparison with its own report, performed by a caller that asks for it - `vidimus check` - and it **MUST NOT** be folded into `verified`. |
 | Key directories and trust roots | `attribution.trusted_by` | A **caller** supplies the directory. The format deliberately defines no signature for one and no network fetch of it: trust arrives from the caller or not at all (section 6.7, D-007). Revocation is a directory revision rather than a protocol. |
-| Size limits | `container.readable` | Nothing here caps entry sizes, so a hostile receipt can ask a verifier to inflate a large entry. A caller reading untrusted receipts **SHOULD** cap the file it opens, and a 0.2 verifier **SHOULD** refuse declared sizes above a bound. Named because the current behaviour is "it works until it does not". |
+| Size limits | `container.readable`, `capture.wacz.readable` | A verifier caps what it will inflate, before inflating it and while inflating it (section 7.8). A receipt larger than the limit is `unsupported`, with the number in the reason, rather than a `fail` - because the limit belongs to the implementation. |
 | Provenance of authorship, watermarking | - | Out of scope. A receipt is evidence about a page, not a claim about who wrote it. |
 
 ## 10. Versioning and extensibility
@@ -864,7 +883,8 @@ still disagree about everything a user cares about.
 
 - **A receipt is untrusted input.** Entry names are confined to the archive by `manifest.shape` -
   no absolute paths, no `..`, no backslashes, no drive letters - because that name reaches a
-  filesystem call in every consumer. Sizes are not capped (section 9).
+  filesystem call in every consumer. Sizes are capped: what a verifier will inflate is decided before it
+  inflates anything, and declared sizes are treated as claims rather than as facts (section 7.8).
 - **A receipt proves the existence of bytes, never their meaning.** `capture.digest` says you hold
   the capture the claim names. What the capture says is a question for a human being.
 - **The signature covers the claim, not the container.** Bytes outside `receipt.json` and the
@@ -888,22 +908,19 @@ The 0.1 draft listed eight. Six have landed, and saying which is part of keeping
 | Key directories | Specified and implemented (section 6.7, D-027). Trusted because chosen, not because signed. |
 | Filling in the profiles | `document-v1` and `wire-v1` are both named; nothing yet *produces* a wire capture automatically, because that is a crawler's job rather than a browser's. |
 | Attaching a receipt to what supports it | Citations and commit trailers are done (D-028). A PDF is not - see below. |
+| Size limits for untrusted input | A verifier caps what it will inflate, before and during (section 7.8, D-030). |
 
 Still open, with the reason each is deferred:
 
-1. **Size limits** for untrusted input (section 9). A hostile receipt can declare a large entry and ask a
-   verifier to inflate it. The shape of the fix is a cap applied *before* inflating, plus a status for a
-   receipt that exceeds it - and the reason it is deferred is that the right default depends on what
-   people actually store, which nobody knows yet.
-2. **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites. It is a
+1. **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites. It is a
    change to the claim's shape rather than to any check, and it should wait until somebody needs it.
-3. **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
+2. **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
    check the text fingerprint (section 4.5) and does not compare that document with the digest the claim
    states. Comparing them is a *new check*, not new code, so it needs the full ceremony section 7.4
    describes - including a vector that fails without it.
-4. **A second implementation.** Not a question for this document, and the most valuable thing anybody
+3. **A second implementation.** Not a question for this document, and the most valuable thing anybody
    could do with it: the vectors currently pin one implementation's answers, which is agreement rather
    than corroboration. `CONTRIBUTING.md` says so first.
-5. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
+4. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
    on purpose rather than for want of time: the first needs a CMS `SignedData` over a byte range, and the
    second is a network fetch a verifier must never make on its own initiative (section 6.7).

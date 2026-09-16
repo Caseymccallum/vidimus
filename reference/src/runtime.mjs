@@ -44,7 +44,7 @@ import { findWarcEntry } from './wacz.mjs';
 export const nodeRuntime = {
   name: 'node',
   digest: (bytes) => sha256(bytes),
-  readContainer: (bytes) => readZip(bytes),
+  readContainer: (bytes, limits) => readZip(bytes, limits),
   keyId: (rawPublicKey) => keyId(rawPublicKey),
   verifySignature: (message, signature, rawPublicKey) => verifyMessage(message, signature, rawPublicKey),
 
@@ -60,11 +60,17 @@ export const nodeRuntime = {
    * @param {string | null} url
    * @returns {Promise<import('./warc.mjs').MainDocument>}
    */
-  mainDocument: async (captureBytes, url) => {
-    const warc = await findWarcEntry(captureBytes, { readContainer: readZip });
-    // Node's inflater, spelled the way Node spells it. The record layer below is the same one the
-    // browser calls, and it is synchronous because both runtimes have a synchronous SHA-256 of their own.
-    const plain = decompress(warc.bytes, (bytes) => new Uint8Array(gunzipSync(bytes)));
+  mainDocument: async (captureBytes, url, limits) => {
+    const cap = limits?.maxEntryBytes ?? Infinity;
+    const warc = await findWarcEntry(captureBytes, {
+      readContainer: (bytes) => readZip(bytes, limits),
+    });
+    // Node's inflater, spelled the way Node spells it, and capped: a gzip bomb inside a receipt is the
+    // same threat as a deflate bomb, one layer further in. Node rejects an infinite ceiling, so an absent
+    // limit means no option rather than an infinite one.
+    const plain = decompress(warc.bytes, (bytes) => new Uint8Array(
+      gunzipSync(bytes, cap === Infinity ? undefined : { maxOutputLength: cap }),
+    ));
     return findMainDocument(plain, url, { digest: (bytes) => sha256(bytes) });
   },
 

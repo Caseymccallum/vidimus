@@ -110,7 +110,7 @@ async function verifyWithPublicKey(input) {
 export const browserRuntime = {
   name: 'browser',
   digest: (bytes) => toHex(sha256(bytes)),
-  readContainer: (bytes) => readZipInBrowser(bytes),
+  readContainer: (bytes, limits) => readZipInBrowser(bytes, limits),
   keyId: (rawPublicKey) => toHex(sha256(rawPublicKey)),
   verifySignature: async (message, signature, rawPublicKey) => {
     const key = await crypto.subtle.importKey('raw', rawPublicKey, ALGORITHM, false, ['verify']);
@@ -129,11 +129,15 @@ export const browserRuntime = {
    * @param {string | null} url
    * @returns {Promise<Record<string, any>>}
    */
-  mainDocument: async (captureBytes, url) => {
-    const warc = await findWarcEntry(captureBytes, { readContainer: readZipInBrowser });
+  mainDocument: async (captureBytes, url, limits) => {
+    const cap = limits?.maxEntryBytes ?? Infinity;
+    const warc = await findWarcEntry(captureBytes, {
+      readContainer: (bytes) => readZipInBrowser(bytes, limits),
+    });
     // A browser's inflater is asynchronous, so the gzip step happens here and the record layer below
-    // stays the synchronous, shared one (D-021).
-    const plain = isGzipped(warc.bytes) ? await inflateGzip(warc.bytes) : warc.bytes;
+    // stays the synchronous, shared one (D-021). The cap is passed with it, because a gzip bomb inside a
+    // receipt is the same threat as a deflate bomb, one layer further in.
+    const plain = isGzipped(warc.bytes) ? await inflateGzip(warc.bytes, cap) : warc.bytes;
     return findMainDocument(plain, url, { digest: (bytes) => toHex(sha256(bytes)) });
   },
 

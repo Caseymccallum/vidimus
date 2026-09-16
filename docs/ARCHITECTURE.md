@@ -609,13 +609,44 @@ Two things this work found, both worth recording:
   than the bits themselves. Reading it one byte early is how a certificate that permits signing reports
   itself as forbidding it.
 
+### D-030 - A verifier decides what it will inflate, before it inflates anything
+
+A receipt is untrusted input, and both of its layers expand: `.receipt` is a ZIP, the WACZ inside it is
+another ZIP, and the WARC inside that is gzipped. The old behaviour was to inflate whatever a file asked
+for, which meant a few kilobytes could ask for gigabytes - named as a limitation in the threat model for
+long enough that it stopped being a note and started being a hole.
+
+Three decisions:
+
+1. **The ceiling is checked twice.** Before the bytes are touched, against the declared size - which costs
+   nothing and refuses the honest bomb - and again *while* inflating, because a declaration is not evidence.
+   Node's `inflateRawSync` and `gunzipSync` take `maxOutputLength`, which stops mid-stream; a browser has no
+   such option, so `browser-zip.mjs` reads the stream in chunks and cancels the reader the moment the total
+   passes the ceiling. That is the difference between refusing a bomb and surviving one.
+2. **A limit is the verifier's, so it is reported as the verifier's.** Every limit refusal carries
+   `code: 'unsupported'`, which the verifier already maps to `unsupported` with the reason - the distinction
+   D-021 draws everywhere else (a gap in the verifier is not a fault in a receipt), and D-008 draws for
+   containers (refuse by name rather than guess). This work also closed a *pre-existing* asymmetry: the
+   capture's WACZ was the one read that reported `fail` for a container it could not open, while the outer
+   container reported `unsupported` for the same thing.
+3. **The limits are the caller's to raise, and this format states none.** They are passed *into* the
+   runtime rather than baked into the readers, so a caller that needs more says so - and the producer passes
+   none at all, because a producer sealing a capture the user chose is not defending against that user.
+
+The numbers - 64 MB an entry, 256 MB a container, 4096 entries - are chosen to be larger than anything this
+project's own producer can write, and a test asserts that against the extension's 8 MB capture limit. A cap
+that refused every receipt this project makes would be a bug with a number attached.
+
+**Found while writing the tests:** Node rejects `maxOutputLength: Infinity`, so "no ceiling" has to mean
+omitting the option rather than passing an infinite one. Two existing tests caught it immediately, because
+they read real DEFLATE archives written by other tools - which is the argument for having vectors made of
+somebody else's output rather than only your own.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,
   with tests. A schema file beside it would be a second source of truth that nothing forces to agree
   with the first.
-- **Size caps.** Named as a limitation in the specification (section 9) and in the threat model,
-  rather than silently absent.
 - **A conformance table of other implementations.** There is one implementation; a table with one row
   would be decoration.
 - **A network layer.** Level 3 is specified as a *report* and not performed: a caller that wants it runs

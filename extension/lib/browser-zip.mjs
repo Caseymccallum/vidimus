@@ -35,17 +35,56 @@ function unsupported(message) {
 }
 
 /**
+ * Read a decompression stream into one buffer, refusing to hold more than `cap` bytes.
+ *
+ * A browser has no synchronous inflater and no `maxOutputLength`, so the ceiling is enforced while the
+ * stream arrives: the reader is cancelled the moment the total passes it, rather than after the allocation
+ * a hostile file was asking for. That is the difference between refusing a bomb and surviving one.
+ *
+ * @param {ReadableStream<Uint8Array>} stream
+ * @param {number} cap
+ * @param {string} what Named in the refusal, so the message says which entry asked for the memory.
+ * @returns {Promise<Uint8Array>}
+ */
+async function readCapped(stream, cap, what) {
+  const reader = stream.getReader();
+  const chunks = [];
+  let total = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > cap) {
+      await reader.cancel();
+      throw unsupported(`${what} expands past the ${cap} bytes this reader will hold in memory`);
+    }
+    chunks.push(value);
+  }
+
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/**
  * Inflate one raw deflate stream, the way a browser can.
  *
  * @param {Uint8Array} bytes
  * @param {string} name
+ * @param {number} cap
  * @returns {Promise<Uint8Array>}
  */
-async function inflateRaw(bytes, name) {
+async function inflateRaw(bytes, name, cap) {
   try {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+    return await readCapped(stream, cap, `"${name}"`);
   } catch (error) {
+    if (error instanceof ZipError) throw error;
     throw new ZipError(`"${name}" could not be inflated: ${error.message}`);
   }
 }
@@ -61,11 +100,12 @@ async function inflateRaw(bytes, name) {
  * @param {Uint8Array} bytes
  * @returns {Promise<Uint8Array>}
  */
-export async function inflateGzip(bytes) {
+export async function inflateGzip(bytes, cap = Infinity) {
   try {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+    return await readCapped(stream, cap, 'the WARC');
   } catch (error) {
+    if (error instanceof ZipError) throw error;
     throw new ZipError(`the WARC could not be decompressed: ${error.message}`);
   }
 }
@@ -93,10 +133,19 @@ function findEndOfCentralDirectory(bytes) {
  * }>}
  * @throws {ZipError}
  */
-export async function readZipInBrowser(bytes) {
+export async function readZipInBrowser(bytes, limits = {}) {
+  const maxEntryBytes = limits.maxEntryBytes ?? Infinity;
+  const maxTotalBytes = limits.maxTotalBytes ?? Infinity;
+  const maxEntries = limits.maxEntries ?? Infinity;
+
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocd = findEndOfCentralDirectory(bytes);
   const totalEntries = view.getUint16(eocd + 8, true);
+  if (totalEntries > maxEntries) {
+    throw unsupported(
+      `this archive lists ${totalEntries} entries, and this reader stops at ${maxEntries}`,
+    );
+  }
   if (totalEntries === 0xffff) throw unsupported('ZIP64 archives are not supported here');
   if (view.getUint16(eocd + 10, true) !== totalEntries) {
     throw unsupported('multi-disk archives are not supported here');
@@ -117,6 +166,7 @@ export async function readZipInBrowser(bytes) {
   /** @type {string[]} */
   const order = [];
   let cursor = directoryStart;
+  let total = 0;
 
   for (let index = 0; index < totalEntries; index += 1) {
     if (view.getUint32(cursor, true) !== CENTRAL_HEADER) {
@@ -136,6 +186,13 @@ export async function readZipInBrowser(bytes) {
 
     if (name.endsWith('/')) continue;
     if ((flags & 0x0001) !== 0) throw unsupported(`"${name}" is encrypted, which is not supported`);
+    // Refused before the bytes are touched, exactly as the command line's reader does it.
+    if (uncompressedSize > maxEntryBytes) {
+      throw unsupported(
+        `"${name}" declares ${uncompressedSize} bytes, and this reader inflates at most `
+        + `${maxEntryBytes} of one entry`,
+      );
+    }
     if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localOffset === 0xffffffff) {
       throw unsupported('ZIP64 archives are not supported here');
     }
@@ -150,13 +207,21 @@ export async function readZipInBrowser(bytes) {
 
     let contents;
     if (method === 0) contents = raw;
-    else if (method === 8) contents = await inflateRaw(raw, name);
+    else if (method === 8) contents = await inflateRaw(raw, name, maxEntryBytes);
     else throw unsupported(`"${name}" uses compression method ${method}, which is not supported here`);
 
     if (contents.length !== uncompressedSize) {
       throw new ZipError(`"${name}" declared ${uncompressedSize} bytes but holds ${contents.length}`);
     }
     if (crc32(contents) !== crc) throw new ZipError(`"${name}" failed its CRC-32 check`);
+
+    total += contents.length;
+    if (total > maxTotalBytes) {
+      throw unsupported(
+        `this archive holds more than the ${maxTotalBytes} bytes of uncompressed content this reader `
+        + 'will keep in memory at once',
+      );
+    }
 
     entries.set(name, contents);
     order.push(name);
