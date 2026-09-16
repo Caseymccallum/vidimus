@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 43 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 45 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -724,6 +724,45 @@ writes the token in. Three notes:
 **Rejected:** having `seal` fetch a token itself. That would mean a network request inside the producer, an
 endpoint to configure, and a receipt whose content depended on whether an authority was up - all to save one
 `openssl ts` invocation. D-005's reasoning, applied to the producer.
+
+### D-034 - A second implementation, written from the specification, in Python
+
+`docs/CONFORMANCE.md` has called the single-implementation problem the biggest gap since the first draft, and
+the kits made it reachable: the fixtures now ship, so an implementer does not start by reimplementing
+`fixtures.mjs`. `conformance/verify_claims.py` is the first slice - the canonical form and the claim hash,
+which is the layer most likely to differ between languages and needs no cryptography at all, because the
+signature is outside the signed subtree.
+
+Three decisions about how it was done, which matter more than what it covered:
+
+1. **Written from the specification, not from the reference.** The rules came from sections 5, 5.1, 5.2 and
+   6.1. Where the two disagreed, the disagreement was the finding rather than something to silently match -
+   and there were three of them, all now fixed in the specification (below).
+2. **One layer, complete, and named as partial.** It implements 2 of the 21 checks and says so in its own
+   output; `conformance/README.md` states that it must not be listed as a conforming implementation. A
+   second implementation that quietly covered half the table would be worse than none, because "agreement"
+   would then mean less than it sounds like.
+3. **It reports what it did not reach, by name.** Four vectors stop at a gate (a fixture that is not a
+   container, a claim that does not parse, an unknown `spec_version`), and two are refused. Those are
+   counted and listed separately from the 39 that agree, because a conformance report that says "no
+   disagreement" without saying what it never looked at is the exact failure mode this project is arranged
+   against.
+
+**What it found**, and what changed because of it:
+
+- **`-0` is only findable on the raw bytes in some languages.** JavaScript keeps the sign through
+  `JSON.parse`; Python's `json` does not. The rule cannot be stated as a check on the parsed value, and the
+  specification now says an implementation may have to read the bytes.
+- **The escaping rule did not state the case of its hex digits** - and, worse, **no fixture contained a
+  control character at all**, so a whole rule was unexercised. There is a vector now
+  (`claim-contains-a-control-character`), and both implementations agree on it byte for byte.
+- **The stage order was a principle rather than gates.** The first version of the second implementation got
+  it wrong and reported two disagreements that were its own - which is the cheapest possible place to learn
+  that "a claim is checked before anything that depends on a key" does not tell an implementer where the
+  gates are.
+
+And two vectors came out of it that would not otherwise exist: the control-character case, and
+`claim-contains-minus-zero`. Both pin behaviour that the vector set had been asserting in prose only.
 
 ## 3. What this implementation deliberately does not have
 

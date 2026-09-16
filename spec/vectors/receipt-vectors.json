@@ -2258,6 +2258,113 @@
       }
     },
     {
+      "id": "claim-contains-a-control-character",
+      "description": "a claim with a C0 control character in an undocumented field",
+      "proves": "the escaping rule from the outside: `\\b \\t \\n \\f \\r` use short forms, every other C0 control is a lowercase \\u escape, and DEL, non-ASCII and astral characters are emitted as themselves. The rule was unexercised by any vector until a second implementation was written against it",
+      "fixture": {
+        "file": "claim-contains-a-control-character.receipt",
+        "sha256": "be66044e0810ba9539be24c805923de18be95c28bf850c30e5abe37503dee78c",
+        "bytes": 2284
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.canonical": "pass"
+        }
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "8e3c4160404406bfdf53d32b577e60c551f69fc4b61a0e14b90257d116605052",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "claim-contains-minus-zero",
+      "description": "a claim whose delivered bytes contain `-0`",
+      "proves": "`-0` has no canonical spelling, and this is the one rule that cannot be enforced after parsing in every language: JavaScript keeps the sign through JSON.parse and refuses it, Python loses it and has to read the raw bytes. The vector pins the behaviour either way",
+      "fixture": {
+        "file": "claim-contains-minus-zero.receipt",
+        "sha256": "b4b2dba4b4eda8deaa3d2a37e19cf27187f6c94c5917b2522d8f9c2c9bc02a17",
+        "bytes": 2222
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.canonical": "fail",
+          "claim.digest": "not_checked",
+          "signature.verify": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "capture_profile": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "manifest.canonical": "fail",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
       "id": "capture-profile-wire",
       "description": "a capture that declares itself the bytes a server sent",
       "proves": "a *recognised* profile is reported without a caveat, so the caveat above means \"unknown\" rather than \"declared\"",

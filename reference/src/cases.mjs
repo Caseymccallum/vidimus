@@ -26,6 +26,7 @@ import { textDigest } from './text.mjs';
 import { TSA_GEN_TIME, tsaCertificate, timestampToken } from './tst-fixture.mjs';
 import { FIXTURE_DATE, waczBytes, waczEntries, DEFAULT_HTML, SPEC_VERSION } from './fixtures.mjs';
 import { writeZip } from './zip.mjs';
+import { canonicalise } from './canonical.mjs';
 import { signMessage } from './signature.mjs';
 import { signingMessage } from './verify.mjs';
 
@@ -832,6 +833,45 @@ export const CASES = [
       exit_code: 2,
       levels: { L0: 'fail', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
       checks: { 'subject.document': 'fail' },
+    },
+  },
+  {
+    id: 'claim-contains-a-control-character',
+    description: 'a claim with a C0 control character in an undocumented field',
+    proves: 'the escaping rule from the outside: `\\b \\t \\n \\f \\r` use short forms, every other C0 control is a lowercase \\u escape, and DEL, non-ASCII and astral characters are emitted as themselves. The rule was unexercised by any vector until a second implementation was written against it',
+    build: () => {
+      const one = String.fromCodePoint(0x01);
+      const backspace = String.fromCodePoint(0x08);
+      return buildReceipt({
+        manifestPatch: (manifest) => {
+          manifest.notes = { label: `a${one}b${backspace}c`, accent: '\u00e9', emoji: '\u{1f600}' };
+        },
+      }).bytes;
+    },
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'manifest.canonical': 'pass' },
+    },
+  },
+  {
+    id: 'claim-contains-minus-zero',
+    description: 'a claim whose delivered bytes contain `-0`',
+    proves: '`-0` has no canonical spelling, and this is the one rule that cannot be enforced after parsing in every language: JavaScript keeps the sign through JSON.parse and refuses it, Python loses it and has to read the raw bytes. The vector pins the behaviour either way',
+    build: () => {
+      // Built by hand, because no conforming serialiser would emit this: canonicalise refuses `-0` outright.
+      const original = buildReceipt();
+      const serialise = (manifest) => utf8(
+        canonicalise(manifest).replace(/("document":\{"bytes":)\d+/, '$1-0'),
+      );
+      return containerOf(original.manifest, original.wacz, serialise);
+    },
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'not_checked', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'manifest.canonical': 'fail', 'claim.digest': 'not_checked', 'signature.verify': 'not_checked' },
     },
   },
   {

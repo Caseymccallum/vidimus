@@ -14,3 +14,7 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/settings.json
+
+# Python's build litter, from the second implementation in conformance/:
+__pycache__/
+*.pyc

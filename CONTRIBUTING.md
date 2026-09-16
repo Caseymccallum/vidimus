@@ -14,7 +14,7 @@ worth more than any amount of additional code.
    not start with reimplementing anybody's fixture builder:
 
    ```bash
-   node reference/src/vectors.mjs --emit ./kit   # 43 fixtures, the answers, and what to do with them
+   node reference/src/vectors.mjs --emit ./kit   # 45 fixtures, the answers, and what to do with them
    ```
 
    The recorded answers are statuses and not prose, so an implementation that disagrees with every word of

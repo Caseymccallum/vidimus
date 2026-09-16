@@ -342,7 +342,10 @@ A canonicaliser **MUST**:
    specifies.
 3. Emit no whitespace anywhere.
 4. Escape only `"`, `\` and C0 controls, using `\b \t \n \f \r` for the five that have short
-   forms, and emit every non-ASCII character as itself.
+   forms, and emit every non-ASCII character as itself - including DEL, which is not a C0 control, and
+   astral characters, which are never written as a surrogate pair. A control character with no short form
+   is written `\u00xx` in **lowercase**, as RFC 8785 has it. The case is stated rather than left to
+   convention: two implementations that agree by accident are two implementations that will disagree later.
 5. Refuse any number that is not an integer, any `-0`, and any integer outside
    `[-(2^53-1), 2^53-1]`.
 6. Refuse values with no JSON representation: `undefined`, functions, bigints, symbols, and
@@ -352,6 +355,18 @@ A canonicaliser **MUST**:
 
 A verifier **SHOULD** refuse nesting deeper than 64 levels so a hostile claim cannot exhaust a
 stack.
+
+Two of those rules are harder to enforce than they look, and both were found by writing a second
+implementation in a different language (`conformance/README.md`):
+
+- **`-0` may have to be detected on the raw bytes.** JavaScript keeps the sign through `JSON.parse`, so a
+  check on the parsed value finds it; Python's `json` returns `0` and the sign is gone before any check can
+  look. An implementation in that position **MUST** inspect the bytes it received, and
+  `claim-contains-minus-zero` pins the behaviour either way.
+- **A parser that keeps the last of two duplicate keys cannot see the first.** That is why section 5.2's
+  byte comparison is a **MUST** rather than a nicety: re-canonicalising the parsed value and comparing it
+  with the delivered bytes is the only check that catches a duplicate, and in most languages the parse has
+  already thrown the evidence away.
 
 ### 5.1 Why integers only, and no floats at all
 
