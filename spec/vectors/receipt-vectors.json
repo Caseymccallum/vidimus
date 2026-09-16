@@ -72,6 +72,11 @@
       "description": "every WACZ resource matches its hash"
     },
     {
+      "id": "subject.document",
+      "level": "L0",
+      "description": "the capture holds the document the claim describes"
+    },
+    {
       "id": "signature.present",
       "level": "L1",
       "description": "the claim carries a signature"
@@ -545,6 +550,7 @@
         "caveat_count": 1,
         "checks": {
           "capture.digest": "fail",
+          "subject.document": "fail",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
@@ -595,6 +601,7 @@
         "caveat_count": 1,
         "checks": {
           "capture.wacz.resources": "fail",
+          "subject.document": "fail",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
@@ -604,7 +611,7 @@
     {
       "id": "claim-edited-after-signing",
       "description": "the cited URL changed after the receipt was signed",
-      "proves": "the signature covers the claim, not the file: editing a signed field leaves bytes that are canonical and a signature that means nothing",
+      "proves": "the signature covers the claim, not the file: editing a signed field leaves bytes that are canonical and a signature that means nothing. L0 also stops passing, because a claim naming a URL its capture holds no record for is a claim about a document this verifier cannot find - and it says so rather than assuming the document is fine",
       "fixture": {
         "file": "claim-edited-after-signing.receipt",
         "sha256": "535ec2d7bf7fe7326d030a33a6102e2a4fdc17ad82f18bf01933e896f455c859",
@@ -615,7 +622,7 @@
         "verified": false,
         "exit_code": 2,
         "levels": {
-          "L0": "pass",
+          "L0": "not_checked",
           "L1": "fail",
           "L2": "not_checked",
           "L3": "not_applicable"
@@ -624,6 +631,7 @@
           "manifest.canonical": "pass",
           "claim.digest": "pass",
           "capture.digest": "pass",
+          "subject.document": "not_checked",
           "signature.verify": "fail"
         }
       },
@@ -633,7 +641,7 @@
         "claim_hash": "1d749a4f6b37684d223324f972934a4537d3973118e5d45aff0243182e757036",
         "capture_profile": null,
         "levels": {
-          "L0": "pass",
+          "L0": "not_checked",
           "L1": "fail",
           "L2": "not_checked",
           "L3": "not_applicable"
@@ -643,8 +651,9 @@
           "key_trusted": "not_checked"
         },
         "time_bound": "claimed_only",
-        "caveat_count": 1,
+        "caveat_count": 2,
         "checks": {
+          "subject.document": "not_checked",
           "signature.verify": "fail",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
@@ -755,6 +764,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "signature.present": "not_applicable",
           "signature.alg": "not_applicable",
           "signature.key_id": "not_applicable",
@@ -821,6 +831,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "signature.present": "not_checked",
           "signature.alg": "not_checked",
           "signature.key_id": "not_checked",
@@ -872,7 +883,7 @@
           "key_trusted": "not_checked"
         },
         "time_bound": "claimed_only",
-        "caveat_count": 1,
+        "caveat_count": 2,
         "checks": {
           "capture.present": "fail",
           "capture.bytes": "not_checked",
@@ -880,6 +891,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
@@ -935,6 +947,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
@@ -994,6 +1007,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "signature.verify": "not_checked",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
@@ -1678,6 +1692,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "signature.present": "not_checked",
           "signature.alg": "not_checked",
           "signature.key_id": "not_checked",
@@ -1740,6 +1755,7 @@
           "capture.media_type": "not_checked",
           "capture.wacz.readable": "not_checked",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "signature.present": "not_checked",
           "signature.alg": "not_checked",
           "signature.key_id": "not_checked",
@@ -1892,10 +1908,11 @@
           "key_trusted": "not_checked"
         },
         "time_bound": "claimed_only",
-        "caveat_count": 1,
+        "caveat_count": 2,
         "checks": {
           "capture.wacz.readable": "fail",
           "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"
@@ -2138,6 +2155,102 @@
         "time_bound": "claimed_only",
         "caveat_count": 2,
         "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "document-digest-wrong",
+      "description": "a claim whose document digest describes a different document",
+      "proves": "the claim is checked against the capture rather than taken at its word: a producer that hashed something other than what it wrote is caught, which is the \"lying author\" the threat model has named since its first draft",
+      "fixture": {
+        "file": "document-digest-wrong.receipt",
+        "sha256": "e79ac7277487fec432541980bcf4122888283565e91860958c29b4a4a6b94084",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "d7e6e251b16adab286f2a0079e6c559dfc9ff356e289515f51527476531cd47e",
+        "capture_profile": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "subject.document": "fail",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "document-length-wrong",
+      "description": "a claim whose document digest is right and whose length is not",
+      "proves": "the length is checked as well as the digest, because it is the one a person checks by eye and \"another size\" is a different sentence from \"different bytes\"",
+      "fixture": {
+        "file": "document-length-wrong.receipt",
+        "sha256": "2667aa4ab64eef5581ad10537da73736661ac6c3e92fa110c2d1edee551bf475",
+        "bytes": 2223
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "c5db6b9c8d7ad86084f63b66ac9e6525aef4815b089c3a1025e522de850c61ad",
+        "capture_profile": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "subject.document": "fail",
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
           "subject.text": "not_applicable"

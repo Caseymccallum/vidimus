@@ -244,7 +244,7 @@ export const CASES = [
   {
     id: 'claim-edited-after-signing',
     description: 'the cited URL changed after the receipt was signed',
-    proves: 'the signature covers the claim, not the file: editing a signed field leaves bytes that are canonical and a signature that means nothing',
+    proves: 'the signature covers the claim, not the file: editing a signed field leaves bytes that are canonical and a signature that means nothing. L0 also stops passing, because a claim naming a URL its capture holds no record for is a claim about a document this verifier cannot find - and it says so rather than assuming the document is fine',
     build: () => {
       const original = buildReceipt();
       const edited = {
@@ -256,11 +256,12 @@ export const CASES = [
     expect: {
       verified: false,
       exit_code: 2,
-      levels: { L0: 'pass', L1: 'fail', L2: 'not_checked', L3: 'not_applicable' },
+      levels: { L0: 'not_checked', L1: 'fail', L2: 'not_checked', L3: 'not_applicable' },
       checks: {
         'manifest.canonical': 'pass',
         'claim.digest': 'pass',
         'capture.digest': 'pass',
+        'subject.document': 'not_checked',
         'signature.verify': 'fail',
       },
     },
@@ -792,6 +793,45 @@ export const CASES = [
       levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
       checks: {},
       caveats: 2,
+    },
+  },
+  {
+    id: 'document-digest-wrong',
+    description: 'a claim whose document digest describes a different document',
+    proves: 'the claim is checked against the capture rather than taken at its word: a producer that hashed something other than what it wrote is caught, which is the "lying author" the threat model has named since its first draft',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        // Plausible and wrong: the digest of the words alone, without the markup around them.
+        manifest.subject.document = {
+          sha256: sha256(utf8('A page worth citing\nClaims were made here.')),
+          bytes: manifest.subject.document.bytes,
+        };
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'fail' },
+    },
+  },
+  {
+    id: 'document-length-wrong',
+    description: 'a claim whose document digest is right and whose length is not',
+    proves: 'the length is checked as well as the digest, because it is the one a person checks by eye and "another size" is a different sentence from "different bytes"',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        manifest.subject.document = {
+          sha256: manifest.subject.document.sha256,
+          bytes: manifest.subject.document.bytes + 1,
+        };
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'fail' },
     },
   },
   {

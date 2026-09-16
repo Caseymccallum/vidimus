@@ -10,7 +10,7 @@
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
 [![Tests](https://img.shields.io/badge/tests-164-3DA639)](#verify-the-claims-yourself)
-[![Vectors](https://img.shields.io/badge/vectors-41-3DA639)](spec/vectors/receipt-vectors.json)
+[![Vectors](https://img.shields.io/badge/vectors-43-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
 </div>
@@ -53,7 +53,7 @@ both facts true, both reported, neither hidden behind the other.
 > one is to misread.
 
 > **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
-> browser extension: 164 tests, 41 conformance vectors, no dependencies. The format is checkable and is
+> browser extension: 164 tests, 43 conformance vectors, no dependencies. The format is checkable and is
 > being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
 > left to be discovered.
 
@@ -140,7 +140,7 @@ exists today:
   success;
 - a capture core that turns what a browser knows into a WACZ - browser-safe, and the module the
   extension imports rather than reimplements (`capture.mjs`);
-- 41 conformance vectors, rebuilt and re-hashed on every run;
+- 43 conformance vectors, rebuilt and re-hashed on every run;
 - five gates, run by `npm run verify` and by CI on Linux and Windows.
 
 The browser shell exists now too, in `extension/`: one button that seals the page you are reading,
@@ -183,7 +183,7 @@ Every claim in this README is a command, and every gate has been shown to be cap
 | --- | --- |
 | Nothing American slipped into the prose | `npm run check:language` |
 | The counts this README quotes are real | `npm run check:docs` |
-| Every check has been seen not passing | `npm test` — the coverage test fails if any of the 20 checks has only ever passed |
+| Every check has been seen not passing | `npm test` — the coverage test fails if any of the 21 checks has only ever passed |
 | The recorded verdicts are current | `npm run vectors:check` — rebuilds every fixture and re-hashes it |
 | The verifier is honest about what it did not check | `node reference/src/cli.mjs verify spec/fixtures/anchor-rfc3161-no-tsa.receipt` |
 | A tampered capture is caught | `node reference/src/cli.mjs verify spec/fixtures/capture-digest-mismatch.receipt` |
@@ -213,11 +213,9 @@ here because a format that cannot say what it grew out of is a format nobody can
   agreement rather than corroboration, and a second reading of the same vectors is the biggest single
   gap. The fixtures ship for it: `node reference/src/vectors.mjs --emit ./kit` writes 41 receipts, the
   verdict each one must produce, and a README with the three steps (D-031).
-- **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
-  check the text fingerprint and does not compare it with the document digest the claim states
-  (section 9 of the specification).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
+- **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites.
 
 ## Citing it
 

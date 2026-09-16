@@ -667,10 +667,28 @@ async function sealCapture(options) {
   console.log('checking what was just written:');
 
   const status = await verify(out, {}, options.json === true);
-  if (status === 0) return 0;
+
+  // 0 is a verified receipt. 1 is "nothing failed, and nothing was proven either" - an unsigned claim, or a
+  // check that could not run here, such as a caller-supplied document whose capture this reader cannot open.
+  // Both are receipts this program may hand over, because both say what they are. **2 is not**: something
+  // failed, and a producer that hands over a failing receipt teaches its first reader to distrust receipts.
+  if (status !== 2) {
+    if (status === 1) {
+      console.log('');
+      console.log('This receipt is not fully verified - read the check lines above. It has not been removed,');
+      console.log('because nothing failed and what could not be checked is named.');
+    }
+    return status;
+  }
 
   unlinkSync(out);
   console.error('');
+  if (document !== null) {
+    console.error(`${out} did not verify, so it has been removed. The document you supplied is not the one`);
+    console.error('the capture holds, so the claim would have described something else - which is exactly the');
+    console.error('kind of receipt this program refuses to write.');
+    return 2;
+  }
   console.error(`${out} did not verify, so it has been removed. That is a bug in this program rather`);
   console.error('than anything you did, and it would be worth reporting with the output above.');
   return 2;

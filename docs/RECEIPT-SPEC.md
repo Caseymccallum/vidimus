@@ -160,15 +160,21 @@ that says `+01:00` and a claim that says `Z` for the same instant are different 
 so a signature over one fails over the other, and the failure looks like a signature problem
 rather than a formatting one. There is exactly one spelling of a moment, and it is this one.
 
-### 4.2 `subject.document` is a claim about the capture, not a check the verifier performs
+### 4.2 `subject.document`, and why a verifier re-derives it
 
 The digest of the main document's body is recorded so that two receipts for the same URL can
-be compared - "the words changed" versus "the bytes changed" - and so that a tool with a WARC
-reader can check it.
+be compared - "the words changed" versus "the bytes changed" - and so that a verifier can check it.
 
-**A verifier MUST NOT re-derive it.** Section 7.4 defines no check for it, because a verifier
-that mis-parses a WARC reports a change that never happened, and declining costs the reader
-nothing.
+**A verifier MUST re-derive it**, and `subject.document` is a check (section 7.4). The field is the claim's
+own account of what its capture holds, and an account nobody checks is a claim taken on the word of whoever
+wrote it: before this check existed, a producer that hashed something other than what it wrote - or that
+pointed the claim at a different document entirely - passed L0 on the strength of a signed *assertion*.
+
+Earlier drafts said the opposite, and the argument was that a verifier which mis-parses a WARC reports a
+change that never happened. That is a real risk, and this format answers it the way it answers every other
+limit: **a capture the verifier cannot read is reported `not_checked`, with the reason** - never as a change,
+and never as a pass. So L0 no longer passes on a receipt whose record this verifier cannot open, because
+"these are the bytes this receipt names" now includes "and this claim describes them".
 
 **A producer MUST derive it**, because the claim requires the field and a producer has no honest
 way to decline. `vidimus seal` reads the response record for `subject.url` from the capture's
@@ -176,13 +182,9 @@ WARC and digests the body that follows the HTTP headers, cut to the length the r
 A producer that cannot read the capture **MUST** refuse to seal rather than write a digest it did
 not measure.
 
-That difference is not an inconsistency; it is the difference between the two jobs. A verifier
-that declines loses nothing, and a producer that guesses writes a falsehood inside a signature
-(D-016).
-
-`subject.text` is the part of this that *is* specified for verification, because "did the page
-change" is the question people actually ask. It is defined over a rendered document and is
-optional.
+`subject.text` is the fingerprint of the *words*, and is optional. `subject.document` is the bytes, and is
+required. A verifier derives both from the same read of the capture - which is why it checks both or neither
+(D-024, D-032).
 
 ### 4.3 Why `anchor` is required even when there is none
 
@@ -317,10 +319,10 @@ report, and it **MUST NOT** be folded into `verified` (section 7.5).
 
 No layout, no cascade: a `display:none` in a stylesheet is invisible to this walk, and so is content
 hidden by a class. No browser error recovery, and no full HTML5 entity table - an unknown named entity
-stays as written, and an out-of-range character reference is not replaced with `U+FFFD`. No
-re-derivation of `subject.document` from the capture: the check above re-reads the document, and does not
-compare that document with the document digest. Section 9 records that gap in the list of things a
-verifier in 0.1 does not do, because the asymmetry is easy to assume away.
+stays as written, and an out-of-range character reference is not replaced with `U+FFFD`.
+
+What it does do is read the document the same way for both checks: `subject.text` re-extracts from it and
+`subject.document` re-derives its digest, from one read of the capture (section 4.2).
 
 A producer that needs any of those - a browser extension extracting from a live DOM, say - **MAY** extract
 however it likes, but a fingerprint it writes is only checkable against the capture if it was produced by
@@ -592,6 +594,7 @@ the moment a partially examined level can print as verified, the level stops mea
 | `capture.media_type` | L0 | The media type is one this verifier reads (`application/wacz` in 0.1). |
 | `capture.wacz.readable` | L0 | The capture is itself a readable container. |
 | `capture.wacz.resources` | L0 | Every resource the capture's `datapackage.json` advertises is present and hashes to what it advertises. |
+| `subject.document` | L0 | The capture's response record for `subject.url` is read, and the document it holds hashes to `subject.document.sha256` and measures `subject.document.bytes`. A capture this reader cannot open is `not_checked`, never a pass (section 4.2). |
 | `signature.present` | L1 | The claim carries a signature with the required fields. |
 | `signature.alg` | L1 | The algorithm is implemented here. |
 | `signature.key_id` | L1 | `key_id` equals the SHA-256 of `public_key`. |
@@ -830,8 +833,7 @@ a limitation somebody will assume away.
 | Not done | Belongs to | Why it is not done yet |
 | --- | --- | --- |
 | Full WACZ validation | `capture.wacz.*` | The receipt layer depends on the container's own resource hashes, not on re-implementing the WACZ specification. Use `py-wacz` or the Webrecorder tooling for that. |
-| WARC parsing, and re-deriving `subject.document` | no check; the **producer** does it | A half-parser that disagrees with a real one reports a *false change*, which is worse than reporting no change. The producer must derive it and refuse when it cannot (section 4.2, D-016). |
-| Comparing that re-read document with `subject.document.sha256` | no check | The verifier re-reads a capture's document to check the text fingerprint (section 4.5), and does not compare it with the document digest the claim states. So a claim whose `subject.document` described a *different* document would still verify on integrity: what L0 establishes is "these are the bytes this receipt names", not "this claim describes them". A candidate check for 0.2, named here rather than assumed away. |
+| Full WARC semantics | `subject.document`, `subject.text` | The verifier reads the response record for `subject.url` and the body after its HTTP headers, and nothing else: no deduplication, no revisit records, no site reconstruction (D-016). A capture whose record this narrow reader will not open is reported `not_checked`, never as a change and never as a pass (section 4.2). |
 | Whether a capture holds the wire bytes or the rendered document | `capture.profile` (section 4.4) | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. A claim now says which kind of capture it holds, and a verifier reports what it declared without judging it: what a capture holds cannot be worked out from its bytes, which is why the field exists. |
 | RFC 3161 token validation | `anchor.verified` | **Done**, against a TSA the caller pins (section 8.3). What is still not done is named there and in `docs/CONFORMANCE.md`: no chain building to a root, no revocation checking, and a stated list of algorithms. |
 | Level 3 (currency) | `subject.text`, and the report in section 7.7 | The verifier checks the claim's own fingerprint (section 4.5) and never fetches anything. Whether the page still says the same words is a comparison with its own report, performed by a caller that asks for it - `vidimus check` - and it **MUST NOT** be folded into `verified`. |
@@ -920,18 +922,16 @@ The 0.1 draft listed eight. Six have landed, and saying which is part of keeping
 | Filling in the profiles | `document-v1` and `wire-v1` are both named; nothing yet *produces* a wire capture automatically, because that is a crawler's job rather than a browser's. |
 | Attaching a receipt to what supports it | Citations and commit trailers are done (D-028). A PDF is not - see below. |
 | Size limits for untrusted input | A verifier caps what it will inflate, before and during (section 7.8, D-030). |
+| Re-deriving `subject.document` from the capture | A check, and L0 depends on it (section 4.2, D-032). |
 
 Still open, with the reason each is deferred:
 
 1. **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites. It is a
    change to the claim's shape rather than to any check, and it should wait until somebody needs it.
-2. **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
-   check the text fingerprint (section 4.5) and does not compare that document with the digest the claim
-   states. Comparing them is a *new check*, not new code, so it needs the full ceremony section 7.4
-   describes - including a vector that fails without it.
-3. **A second implementation.** Not a question for this document, and the most valuable thing anybody
+2. **A second implementation.** Not a question for this document, and the most valuable thing anybody
    could do with it: the vectors currently pin one implementation's answers, which is agreement rather
-   than corroboration. `CONTRIBUTING.md` says so first.
-4. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
+   than corroboration. `CONTRIBUTING.md` says so first, and `--emit` writes the fixtures so that the work
+   does not start with reimplementing ours.
+3. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
    on purpose rather than for want of time: the first needs a CMS `SignedData` over a byte range, and the
    second is a network fetch a verifier must never make on its own initiative (section 6.7).

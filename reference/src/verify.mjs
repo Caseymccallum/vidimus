@@ -87,6 +87,7 @@ export const CHECKS = [
   { id: 'capture.media_type', level: 'L0', description: 'the capture is a container this verifier reads' },
   { id: 'capture.wacz.readable', level: 'L0', description: 'the capture is a readable WACZ' },
   { id: 'capture.wacz.resources', level: 'L0', description: 'every WACZ resource matches its hash' },
+  { id: 'subject.document', level: 'L0', description: 'the capture holds the document the claim describes' },
   { id: 'signature.present', level: 'L1', description: 'the claim carries a signature' },
   { id: 'signature.alg', level: 'L1', description: 'the signature algorithm is supported' },
   { id: 'signature.key_id', level: 'L1', description: 'key_id is the digest of public_key' },
@@ -192,7 +193,13 @@ export async function verifyReceipt(bytes, options = {}) {
   const state = newState();
 
   const shapeOk = await verifyContainer(bytes, state, runtime);
-  if (shapeOk) await verifyCapture(state, runtime);
+  if (shapeOk) {
+    await verifyCapture(state, runtime);
+    // Re-derives the claim's own account of the document, which is the last L0 check that used to be taken on
+    // the producer's word (D-032). It runs after the capture has been checked, because a document read out of
+    // a container whose hashes do not match is not evidence of anything.
+    await verifyDocument(state, runtime);
+  }
   recordGaps(state, 'L0', gapReason(state, 'L0'));
 
   if (state.manifest === null) {
@@ -515,6 +522,7 @@ function newState() {
     keyId: null,
     trust: 'not_checked',
     directoryEntry: null,
+    document: null,
     time: { claimed: null, bound: 'claimed_only', authority: null, attestedBefore: null },
   };
 }
@@ -532,6 +540,90 @@ function record(state, id, status, reason) {
   const known = CHECKS.find((check) => check.id === id);
   if (known === undefined) throw new Error(`unknown check id: ${id}`);
   state.results.push({ id, level: known.level, status, ...(reason ? { reason } : {}) });
+}
+
+/**
+ * The capture's own document, read once and remembered.
+ *
+ * Two checks need it - `subject.document` re-derives it, and `subject.text` re-extracts from it - and
+ * inflating the same WARC twice for one verdict would be work nobody asked for. Failures come back as
+ * `problem` rather than as throws, because *why* it could not be read is what both checks have to report,
+ * and because a capture this narrow reader will not open is a fact about the verifier rather than a fault in
+ * the receipt (D-021).
+ *
+ * @param {VerificationState} state
+ * @param {Record<string, any>} runtime
+ * @returns {Promise<{ body: Uint8Array, status: number | null, url: string | null } | { problem: string }>}
+ */
+async function readDocument(state, runtime) {
+  if (state.document !== null) return state.document;
+
+  const manifest = /** @type {Record<string, any>} */ (state.manifest);
+  const captureBytes = state.entries.get(manifest.capture.path);
+  if (captureBytes === undefined) {
+    state.document = { problem: 'the capture this describes is not in the receipt' };
+    return state.document;
+  }
+  if (typeof runtime.mainDocument !== 'function') {
+    state.document = { problem: "this runtime cannot re-read a capture's document" };
+    return state.document;
+  }
+
+  try {
+    const document = await runtime.mainDocument(captureBytes, manifest.subject.url, LIMITS);
+    state.document = {
+      body: document.body,
+      status: Number.isInteger(document.status) ? document.status : null,
+      url: typeof document.url === 'string' ? document.url : null,
+    };
+  } catch (error) {
+    state.document = { problem: `the capture's document could not be re-read: ${error.message}` };
+  }
+  return state.document;
+}
+
+/**
+ * Level 0: the capture holds the document the claim describes.
+ *
+ * This is the check the threat model has named since its first draft - *"a claim that lies about its own
+ * contents verifies"*. `subject.document` was **serialised** by the producer and never re-derived, so a
+ * claim whose digest described a different document passed L0 on the strength of its own word. Now the
+ * verifier reads the capture and compares, which it can do because it already reads the document for the
+ * text fingerprint (D-024, D-032).
+ *
+ * Both the digest and the length are checked. The length is redundant with the digest, and kept anyway,
+ * because it is the one a person checks by eye - and "the claim describes a document of another size" is a
+ * different sentence from "the bytes hash differently".
+ *
+ * @param {VerificationState} state
+ * @param {Record<string, any>} runtime
+ */
+async function verifyDocument(state, runtime) {
+  const manifest = /** @type {Record<string, any>} */ (state.manifest);
+  const claimed = manifest.subject?.document ?? {};
+  const read = await readDocument(state, runtime);
+
+  if ('problem' in read) {
+    // Not a failure: the claim may be perfectly honest and the capture simply beyond this reader. What must
+    // not happen is L0 saying `pass` on the strength of a digest nobody confirmed.
+    record(state, 'subject.document', 'not_checked', read.problem);
+    state.caveats.push(`the claim's own account of the document was not confirmed: ${read.problem}`);
+    return;
+  }
+
+  const actual = await runtime.digest(read.body);
+  if (actual !== claimed.sha256) {
+    record(state, 'subject.document', 'fail',
+      `the capture holds a document that hashes to ${actual}, and the claim says ${claimed.sha256}`);
+    return;
+  }
+  if (read.body.length !== claimed.bytes) {
+    record(state, 'subject.document', 'fail',
+      `the capture holds a ${read.body.length}-byte document, and the claim says ${claimed.bytes}`);
+    return;
+  }
+
+  record(state, 'subject.document', 'pass');
 }
 
 /**
@@ -1049,26 +1141,15 @@ async function verifyText(state, runtime) {
       'the capture this fingerprint describes is not in the receipt, so there was nothing to re-read');
     return;
   }
-  if (typeof runtime.mainDocument !== 'function') {
+  const read = await readDocument(state, runtime);
+  if ('problem' in read) {
     record(state, 'subject.text', 'not_checked',
-      "this runtime cannot re-read a capture's document, so the fingerprint was not recomputed");
-    state.caveats.push('a text fingerprint is declared and this runtime could not recompute it');
-    return;
-  }
-
-  let document;
-  try {
-    document = await runtime.mainDocument(captureBytes, manifest.subject.url, LIMITS);
-  } catch (error) {
-    // A capture whose WARC this reader will not read is not a capture that failed a test. Reporting it as
-    // a failure would be the safer lie, and still a lie (D-021).
-    record(state, 'subject.text', 'not_checked',
-      `the capture's document could not be re-read, so the fingerprint was not recomputed: ${error.message}`);
+      `${read.problem}, so the fingerprint was not recomputed`);
     state.caveats.push('a text fingerprint is declared and its document could not be re-read');
     return;
   }
 
-  const actual = textDigest(document.body);
+  const actual = textDigest(read.body);
   record(state, 'subject.text', actual === text.sha256 ? 'pass' : 'fail',
     actual === text.sha256
       ? undefined

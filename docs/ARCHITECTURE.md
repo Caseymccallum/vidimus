@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 41 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 43 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -666,6 +666,39 @@ them. Three decisions inside that:
 What the kit deliberately excludes is as much the point: reasons, prose and the `expect` field stay behind,
 because they are documentation of *why*, and a second implementation should be free to disagree with the
 wording. What it must not be free to disagree with is which check reported what.
+
+### D-032 - `subject.document` is re-derived, and a record nobody can read no longer passes L0
+
+Section 4.2 used to say **"A verifier MUST NOT re-derive it"**, on the argument that a verifier which
+mis-parses a WARC reports a change that never happened. That argument was sound about *change* and wrong about
+*verification*: the field is the claim's own account of what its capture holds, and an account nobody checks
+is taken on the word of whoever wrote it. A producer that hashed something else - or that pointed the claim at
+another document entirely - passed L0 on a signed *assertion*, which is the "lying author" the threat model
+has named since its first draft.
+
+The objection is answered rather than dropped. A capture this narrow reader cannot open is reported
+`not_checked` **with the reason**, never as a change and never as a pass - the rule the rest of the verifier
+already follows for its own limits (D-021). The consequence is deliberate and worth stating plainly: **a
+receipt whose record this verifier cannot read no longer passes L0**, because "these are the bytes this
+receipt names" now includes "and this claim describes them". That is a tightening, and it moves `verified`
+for receipts that were previously green on the strength of a digest nobody had confirmed.
+
+Three details:
+
+1. **One read, two checks.** `subject.text` and `subject.document` share a cached read of the capture, so
+   neither pays for the other's inflation.
+2. **The length is checked as well as the digest.** Redundant by construction, and kept, because it is the
+   one a person checks by eye - and "the claim describes a document of another size" is a different sentence
+   from "the bytes hash differently".
+3. **The producer now refuses to write a claim that lies.** `seal --document` exists for captures this
+   reader cannot open; aimed at a capture it *can* open, the override makes the claim describe bytes the
+   capture does not hold, and `seal`'s self-check catches it and removes the file (D-017).
+
+**Found while doing this, and worth recording:** `seal`'s self-check demanded exit code 0, so *any* receipt
+that was sound but not fully verified was deleted with "that is a bug in this program". That included
+`seal --unsigned` - a documented flag - and a caller-supplied document on a capture this reader cannot open,
+which is that flag's entire purpose. A producer should refuse receipts that **fail** (exit 2) and hand over
+receipts that say what they are (exit 0 or 1). It now does, and says which.
 
 ## 3. What this implementation deliberately does not have
 

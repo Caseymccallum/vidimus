@@ -23,7 +23,7 @@ regenerable from a recipe - and a recipe is not a kit, so there is a command tha
 node reference/src/vectors.mjs --emit ./kit
 ```
 
-`./kit` holds the 41 fixtures, `receipt-vectors.json`, and a README with the three steps: check each fixture
+`./kit` holds the 43 fixtures, `receipt-vectors.json`, and a README with the three steps: check each fixture
 against its recorded digest, verify it, compare the statuses. Nothing in it requires this repository's code.
 Believing a conformance suite without checking a fixture's digest first is the failure mode the digest is
 there to prevent.
@@ -90,6 +90,7 @@ Grouped by what they are for:
 | **Tampering with the capture** | `capture-digest-mismatch`, `capture-resource-mismatch`, `capture-length-wrong`, `capture-not-a-wacz`, `capture-media-type-unknown`, `capture-missing` |
 | **Tampering with the claim** | `claim-edited-after-signing`, `claim-not-canonical`, `claim-contains-a-float`, `spec-version-unknown`, `manifest-missing`, `manifest-not-json`, `capture-path-escapes` |
 | **The text fingerprint** | `text-fingerprint-wrong` - a claim whose fingerprint is plausible and not what its capture says. Kept because it was a real bug in this project's own fixture |
+| **The document digest** | `document-digest-wrong`, `document-length-wrong` - the claim's own account of its capture, re-derived and contradicted (section 4.2) |
 | **The capture profile** | `capture-profile-declared`, `capture-profile-wire`, `capture-profile-unrecognised` - declared, reported, never judged |
 | **Signature** | `signature-from-another-claim`, `signature-key-id-mismatch`, `signature-algorithm-unsupported`, `signature-shape-broken` |
 | **Anchors** | `anchor-chain-head`, `anchor-chain-linked`, `anchor-chain-unlinked`, `anchor-chain-unfollowed`, `anchor-chain-head-with-predecessor`, `anchor-bolted-on`, `anchor-rfc3161-no-tsa`, `anchor-rfc3161-verified`, `anchor-rfc3161-wrong-imprint`, `anchor-rfc3161-untrusted-tsa`, `anchor-unknown-type` |
@@ -118,7 +119,7 @@ a limitation written down is part of conformance, and one left implicit is a cla
 | Gap | Where it shows | What it would take |
 | --- | --- | --- |
 | **RFC 3161 anchors** | `anchor.verified` | **Implemented** against a TSA the caller pins (`--tsa`): content type and imprint, `genTime` inside the signing certificate's validity, the `timeStamping` extended key usage, and the signature over the `signedAttrs` as a `SET OF`. The limits are named rather than implied: no chain building to a root (a pin *is* an anchor, and a token signed by anything else is `not_checked` with its fingerprint reported), no revocation checking, and only RSA PKCS#1 v1.5 or ECDSA signatures with SHA-256, SHA-384 or SHA-512, SHA-256 imprints, SHA-256 content digests, and signers named by issuer and serial number. Anything outside that is `unsupported`, never `pass` and never `fail`. |
-| **`subject.document` is not re-derived** | `capture.wacz.resources` passes while the document digest is unchecked | The verifier re-reads a capture's document to check the text fingerprint, and does not compare it with `subject.document.sha256`. Comparing them is a new check rather than new code, so it needs a specification change and vectors - named in section 9 of the specification as a candidate for 0.2. |
+| **`subject.document`** | `subject.document: fail` | **Implemented** (section 4.2, D-032): the capture's document is re-derived and compared with the digest and length the claim states. A receipt whose record this reader cannot open reports `not_checked`, which means L0 does not pass - a tightening that is deliberate and named. |
 | **Level 3 (currency)** | L3 verifies the claim's own fingerprint; nothing compares a receipt with the live page | The comparison is specified (section 7.7 of the specification) and implemented as `vidimus check`: it verifies the receipt, fetches the URL, seals a second receipt for what the page says now, and prints a report with five outcomes - including "the bytes changed and the words did not". It never touches `verified`, and `--require-same-words` opts in to letting the comparison decide an exit code. |
 | **Size limits** | `container.readable: unsupported` past the ceiling | A verifier caps what it will inflate, before and during (section 7.8 of the specification, D-030). The numbers are the implementation's and a caller may raise them; exceeding one is `unsupported` with the number named, never a `fail` - a limit belongs to the verifier, not to the receipt. |
 | **A second implementation** | Section 11's conformance list | Another language reading the same vectors. Until then the vectors pin one implementation's answers, which is agreement rather than corroboration, and the threat model says as much. |

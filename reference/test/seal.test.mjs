@@ -162,7 +162,17 @@ test('a caller-supplied document is used, and the claim says less because of it'
   // The capture answered nothing, so the claim asserts nothing about the response beyond the body.
   assert.equal(sealed.manifest.subject.status, undefined);
   assert.equal(sealed.manifest.subject.content_type, undefined);
-  assert.equal((await verifyReceipt(sealed.bytes)).verified, true);
+
+  // And the verdict says exactly that: the claim's account of the document is the caller's word, and a
+  // verifier that cannot confirm it says `not_checked` rather than `pass` - which is why L0 no longer passes
+  // (D-032). Nothing *failed*, so the exit code is 1 rather than 2: a receipt whose record this reader cannot
+  // open is not a broken receipt, it is one whose document nobody can confirm.
+  const verdict = await verifyReceipt(sealed.bytes);
+  assert.equal(verdict.checks.find((check) => check.id === 'subject.document').status, 'not_checked');
+  assert.equal(verdict.levels.L0.status, 'not_checked');
+  assert.equal(verdict.verified, false);
+  assert.equal(verdict.exit_code, 1);
+  assert.equal(verdict.levels.L1.status, 'pass', 'the signature is untouched by any of this');
 });
 
 test('a capture time that is not UTC to the second is refused', async () => {

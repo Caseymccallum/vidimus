@@ -53,10 +53,11 @@ misread them:
 - **The choice of what got captured.** A receipt proves what somebody decided to record. An archive
   assembled by a partisan is a partisan archive, and every one of its receipts can be perfectly
   valid.
-- **A lying author.** Nothing stops someone capturing a page they edited themselves, or writing a
-  claim whose `subject.document` digest does not describe the capture. That digest is *serialised*
-  by the claim and *not re-derived* by a 0.1 verifier (section 4.2), so a claim that lies about its
-  own contents verifies.
+- **A lying author, mostly.** A producer that hashes something other than what it wrote, or that points its
+  claim at a different document, is now caught: `subject.document` is re-derived from the capture rather than
+  taken on the claim's word (section 4.2). What is still outside this: a producer that captures a *different*
+  page from the one a reader expects, and a claim whose `subject.url` is a page the capture really does hold
+  but that nobody else was shown. A receipt proves what somebody decided to record.
 - **A dishonest or compromised capture tool.** The tool writes the claim and hashes the capture. A
   tool that hashes a different capture than it writes, or that silently omits half the page,
   produces a receipt that verifies perfectly. Trust in a receipt begins with trust in the program
@@ -85,11 +86,11 @@ misread them:
   remembers to add it to a list.
 - **A receipt cannot affect anything.** It is bytes. Nothing here blocks, redirects, rewrites or
   observes a request.
-- **The verifier never trusts the claim for anything it can compute.** Digests, key ids, lengths, hashes
-  and the text fingerprint are recomputed from the bytes. The fields a verifier does *not* recompute -
-  `subject.document`, and the name a claim gives its signer - are named as unchecked in section 9 of the
-  specification, and are reported as unchecked rather than presented as findings. A key directory is how
-  a caller answers the second of those; it is the caller's document, never this project's (section 6.7).
+- **The verifier never trusts the claim for anything it can compute.** Digests, key ids, lengths, hashes,
+  the text fingerprint and the document digest are recomputed from the bytes. The fields it does *not*
+  recompute - the claimed capture time, and the name a claim gives its signer - are reported as such rather
+  than presented as findings. A key directory is how a caller answers the second; nothing answers the first
+  except an anchor (sections 6.7 and 8.3).
 - **An anchor is trusted only as far as its own rules.** A chain anchor is checked for internal
   consistency, not confirmation: it orders receipts inside one archive and attests nothing to a stranger.
   An RFC 3161 token is validated against a certificate *the caller pinned*, by DER or fingerprint, and
