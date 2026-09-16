@@ -9,14 +9,12 @@ corroboration."* This directory is the beginning of that, and it is deliberately
 
 | File | What it is |
 | --- | --- |
-| `verify_claims.py` | The canonical form, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 5, 5.1, 5.2, 6.1, 6.3 and 6.4) rather than from `reference/`. No dependencies beyond the standard library. |
+| `verify_claims.py` | The container, the claim, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 3, 5, 6, 7 and 12) rather than from `reference/`. No dependencies beyond the standard library. |
+| `container.py` | Reading a receipt's ZIP, the names inside it, and the WACZ capture it names - including the resource hashes the capture advertises for itself. |
 | `ed25519.py` | Ed25519 verification, written from RFC 8032. Python's standard library has none, and checking a signature with the same library in two languages would be one check rather than two. |
 
-It covers **6 of the 21 checks**: `manifest.canonical`, the `spec_version` gate, the claim hash, and
-`signature.present`, `signature.alg`, `signature.key_id` and `signature.verify`. It applies the stage order
-the specification's section 6.5 implies, reads the signing message by looking the prefix up per major
-version (section 6.4), and fills in the checks a stopped stage never reached with `not_checked`, because a
-verdict contains every check (section 7.2).
+It covers **17 of the 21 checks**: everything except the four that need an anchor, a WARC reader or a text
+extractor (`anchor.present`, `anchor.verified`, `subject.document`, `subject.text`).
 
 ```bash
 node reference/src/vectors.mjs --emit ./kit        # the fixtures and the answers
@@ -26,26 +24,20 @@ python conformance/verify_claims.py ./kit          # exit 0 when nothing disagre
 ## The result
 
 ```
-claim hashes: 39 of 45 fixtures agree
-2 refused, and the record says the same (a corroborated refusal, not a pass by silence)
-4 not reached by this implementation, and named so that silence is not mistaken for a pass:
-  - container-not-a-zip, spec-version-unknown, manifest-missing, manifest-not-json
+claim hashes: 42 of 45 fixtures agree
+3 refused, and the record says the same (a corroborated refusal, not a pass by silence)
 0 disagree
 ```
 
-Two independent implementations of `canonical-json-v1` and of the signing rules, written from the same
-document in two languages, derive the same claim hash for every claim that reaches one, and reach the same
-verdict about the signature — including, for every signed fixture, verifying the Ed25519 signature over
-`vidimus/claim/<version>:<claim_hash>` with arithmetic in one language and a platform library in the other.
-
-The four "not reached" fixtures are not containers or hold no parseable claim: the kit records the same thing
-(`container.readable: fail`, `manifest.parseable: fail`, `spec_version: fail`), so this is agreement rather
-than omission — but it is listed by name, because a conformance report that says "no disagreement" without
-saying what it never looked at is the failure mode this project is arranged against.
+Every check this implementation models has, for every fixture, the status the reference recorded — including
+the Ed25519 signatures, verified with arithmetic written from RFC 8032 over a message built from the claim
+hash this implementation derived itself, against a platform library on the other side. The three refusals are
+claims the format does not admit (a float, a `-0`, a version this implementation does not read), and the
+record agrees that they are refused.
 
 ## What writing it found
 
-Four things that only showed up when somebody implemented the format somewhere else. The first three are now
+Six things that only showed up when somebody implemented the format somewhere else. The first four are now
 fixed in the specification, and two have vectors of their own.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
@@ -56,24 +48,37 @@ fixed in the specification, and two have vectors of their own.
 2. **The escaping rule did not state the case of its hex digits** — and, worse, **no fixture contained a
    control character at all**, so a whole rule was unexercised. Both implementations now agree on it byte for
    byte, and `claim-contains-a-control-character` pins it.
-3. **The stage order is stated as a principle, not as gates.** Section 7 says a claim is checked before
-   anything that depends on a key, a third party or a network; what an implementer needs is narrower — an
-   unknown `spec_version` stops *before* the canonical comparison, and a claim that does not parse records
-   `manifest.parseable: fail` with everything after it `not_checked`. The kit records what the reference did,
-   so it is discoverable, which is what the vectors are for.
-4. **`signature.present` means the signature *carries the required fields*, not that it is an object.** The
+3. **`signature.present` means the signature *carries the required fields*, not that it is an object.** The
    first version of this file treated a `signature` object as a pass and got three statuses wrong on
    `signature-shape-broken`. The kit caught it on the first run, which is the whole argument for recording
    statuses rather than prose: an implementer can disagree with every sentence in the specification and still
    be told, precisely, which check they got wrong.
+4. **The safe-entry-name rule is only in code.** Section 12 states the principle (*"no absolute paths, no
+   `..`, no backslashes, no drive letters"*) and the enumeration — the length cap, the refusal of `//`, of a
+   trailing dot-segment, of a colon — is in `reference/src/verify.mjs`. A second implementer cannot infer a
+   list from a principle, and this implementation guessed at `MAX_ENTRY_NAME` rather than reading it. **The
+   specification should state the list.** It is not yet fixed, and that is stated here rather than left as an
+   implication.
+
+And two about *when* checks run, which the specification states as a principle and an implementer needs as a
+picture. Both were reported by the kit as disagreements, and both were this implementation's fault:
+
+5. **The stages are not a chain.** A claim that fails the *claim* stage still has its **signature** checked:
+   attribution depends on a manifest having parsed, not on the claim being sound. This implementation
+   modelled a linear pipeline, so a receipt with an unknown `spec_version` reported three attribution statuses
+   as `not_checked` where the record says `pass`. Equally, a claim whose bytes are not canonical is
+   `manifest.canonical: fail` **and carries on** — the claim hash comes from the parsed value, not from the
+   delivered bytes — while a claim with *no* canonical form at all stops. Two ways to fail, two different
+   consequences, and `claim-not-canonical` and `claim-contains-a-float` are the two vectors that tell them
+   apart.
 
 ## What this is not
 
 **It is not a conforming implementation, and it must not be listed as one.** Section 11 requires every check
-in section 7.4: this implements 6 of the 21. The container's own resource hashes, the anchors, the text
-fingerprint, the document digest and the rest are not written yet, and several of them depend on reading a
-WACZ and a WARC rather than a claim.
+in section 7.4: this implements 17 of the 21, and the four it does not — `anchor.present`, `anchor.verified`,
+`subject.document` and `subject.text` — are exactly the ones that need an anchor parser, a WARC reader and a
+text extractor rather than a claim.
 
-The next slice is **L0's container checks** — `capture.present`, `capture.bytes`, `capture.digest`,
-`capture.media_type` and `capture.wacz.readable` — which need a ZIP reader (the standard library has one) and
-the WACZ lookup, and would take the count to 11 of 21.
+The next slice is **`subject.document`**: reading the response record out of the WACZ's WARC and comparing its
+body with the digest the claim states. It needs a WARC reader (the record boundaries, the HTTP block, the
+length) and it would take the count to 18 of 21.

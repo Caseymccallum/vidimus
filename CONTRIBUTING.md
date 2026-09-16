@@ -12,7 +12,7 @@ worth more than any amount of additional code.
    [`spec/vectors/receipt-vectors.json`](spec/vectors/receipt-vectors.json) would turn "the reference
    implementation agrees with itself" into corroboration. It has been started:
    [`conformance/verify_claims.py`](conformance/verify_claims.py) covers the canonical form, the claim hash
-   and the signature family - 6 of the 21 checks - and agrees with the record on 39 of 45 fixtures. The
+   and the signature family - 17 of the 21 checks - and agrees with the record on 39 of 45 fixtures. The
    fixtures ship for extending it, so nobody starts by reimplementing anybody's fixture builder:
 
    ```bash
@@ -21,8 +21,8 @@ worth more than any amount of additional code.
    ```
 
    The recorded answers are statuses and not prose, so an implementation that disagrees with every word of
-   our reasons is still conformant. The next slice is L0's container checks, which take it to 11 of 21
-   (`conformance/README.md`).
+   our reasons is still conformant. The next slice is `subject.document`, which needs a WARC reader and takes
+   it to 18 of 21 (`conformance/README.md`).
 2. **Token validation against a real authority.** Section 8.3 is implemented (`rfc3161.mjs`) and validated
    against a TSA certificate the caller pins. What nobody has tried yet is a token from a real timestamping
    authority: a certificate whose key is a chain rather than a pin, which is where the refusal to build

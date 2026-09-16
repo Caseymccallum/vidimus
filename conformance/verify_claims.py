@@ -39,6 +39,7 @@ from base64 import urlsafe_b64decode
 from pathlib import Path
 
 import ed25519
+import container
 
 # Section 6.4: the message a signature covers, looked up by major version rather than built from a constant,
 # because this string is inside every signature ever produced (D-013, D-015).
@@ -210,28 +211,56 @@ def from_base64url(value: str) -> bytes:
 # Section 7.4's signature checks, in the order a verdict lists them.
 SIGNATURE_CHECKS = ("signature.present", "signature.alg", "signature.key_id", "signature.verify")
 
+# Every check this implementation models. The four it does not are exactly the ones needing an anchor, a
+# WARC or a text extractor: `anchor.present`, `anchor.verified`, `subject.document` and `subject.text`.
+MODELLED_CHECKS = (
+    "container.readable",
+    "manifest.present",
+    "manifest.parseable",
+    "manifest.spec_version",
+    "manifest.canonical",
+    "manifest.shape",
+    "claim.digest",
+    "capture.present",
+    "capture.bytes",
+    "capture.digest",
+    "capture.media_type",
+    "capture.wacz.readable",
+    "capture.wacz.resources",
+    "signature.present",
+    "signature.alg",
+    "signature.key_id",
+    "signature.verify",
+)
 
-def signature_statuses(manifest: dict, derived_hash: str) -> dict:
+
+def fill(statuses: dict) -> dict:
+    """Every modelled check, with the ones a stopped stage never reached as `not_checked` (section 7.2).
+
+    Filling these in is not decoration. A comparison that only produced the statuses it happened to reach
+    would report agreement on a vector where three recorded statuses were never looked at - which is the
+    failure mode this whole project is arranged against.
+    """
+    return {check_id: statuses.get(check_id, "not_checked") for check_id in MODELLED_CHECKS}
+
+
+def signature_statuses(manifest: dict, derived_hash: str | None) -> dict:
     """The signature checks, as this implementation sees them (sections 6.3 and 7.4).
 
-    Every check in the family comes back, including the ones a stopped stage never reached - section 7.2: a
-    verdict contains every check, and one that never ran is `not_checked`, never a pass. Filling those in is
-    not decoration: a comparison that only produced the statuses it happened to reach would report agreement
-    on a vector where three recorded statuses were never looked at.
+    `derived_hash` is None when the claim hash could not be derived - a claim that failed the canonical form,
+    or declared a version this implementation does not read. The *shape* checks do not need it, and they run
+    regardless: the reference verifier checks attribution whenever a claim parsed, even when the claim itself
+    failed. Modelling that as a chain, where a stopped claim stage silences everything after it, is what this
+    implementation did first and what the kit corrected.
     """
     signature = manifest.get("signature")
 
-    # A claim with no signature is not a failure: everything in the family is `not_applicable`, exactly as
-    # the reference reports it.
     if signature is None:
         return dict.fromkeys(SIGNATURE_CHECKS, "not_applicable")
 
     def stopped(statuses: dict) -> dict:
-        """This stage stopped: everything it did not reach is `not_checked`."""
         return {**dict.fromkeys(SIGNATURE_CHECKS, "not_checked"), **statuses}
 
-    # `signature.present` is about the signature carrying the fields the format requires, not merely being an
-    # object. Getting that wrong is what this implementation did first, and the kit caught it.
     required = ("alg", "key_id", "public_key", "sig")
     if not isinstance(signature, dict) or not all(
         isinstance(signature.get(field), str) for field in required
@@ -246,10 +275,12 @@ def signature_statuses(manifest: dict, derived_hash: str) -> dict:
 
     public_key = from_base64url(signature["public_key"])
     if hashlib.sha256(public_key).hexdigest() != signature["key_id"]:
-        # A key id is derived, never asserted: one that does not match its own public key is a failure, not a
-        # reason to check the signature against the key it names.
         return stopped({**statuses, "signature.key_id": "fail"})
     statuses["signature.key_id"] = "pass"
+
+    if derived_hash is None:
+        # The shape is fine and there is nothing to check it against: `not_checked`, with no guess.
+        return stopped({**statuses, "signature.verify": "not_checked"})
 
     prefix = SIGNING_PREFIXES.get(int(manifest["spec_version"].split(".")[0]))
     if prefix is None:
@@ -302,23 +333,18 @@ def refuses_minus_zero(raw: bytes) -> bool:
 def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     """What this implementation can say about one vector: (disagreements, outcome).
 
-    The outcome is one of `agreed` (derived the same claim hash as the record), `refused` (this claim has no
-    canonical form, and the record says the same), or `skipped` (the fixture is not a container, holds no
-    claim, or the claim stops at a gate before anything is derived - all of which the record also says).
-    `skipped` is *not* a pass: it is named and listed, because "no disagreement" must never be mistakable for
-    "checked".
+    The outcome is `agreed` (every check this implementation models has the status the record gives it) or
+    `refused` (this claim has no canonical form, and the record says the same). A refusal is a corroboration,
+    not a pass by silence.
 
-    The stage order is the first thing a second implementation has to learn. `docs/RECEIPT-SPEC.md` section 7
-    states the *principle* - a claim is checked before anything that depends on a key, a third party or a
-    network - and the kit records where the reference verifier stopped: a claim that does not parse, or that
-    declares a specification version this implementation does not read, never reaches the canonical form at
-    all, and the record says so (`manifest.parseable: fail`, `manifest.canonical: not_checked`).
+    Two rules from section 7 shape the whole function. **Every verdict contains every check**, so the checks
+    this implementation does not model are simply absent from its own comparison rather than assumed to have
+    passed - and the checks it *does* model always get a status, with the ones a stopped stage never reached
+    filled in as `not_checked`. And **a stage that did not run is not a failure**: a claim that does not
+    parse, or a container that is not a zip, stops with a reason rather than a guess.
     """
     fixture = kit / "fixtures" / vector["fixture"]["file"]
     checks = vector["verdict"]["checks"]
-
-    # The recorded answers. A check that is *absent* from the record passed - the convention the kit's own
-    # README states, so that prose and green ticks do not travel with it.
     expected_hash = vector["verdict"]["claim_hash"]
 
     raw_fixture = fixture.read_bytes()
@@ -329,84 +355,102 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
             "agreed",
         )
 
+    statuses: dict[str, str] = {}
+
+    # 1. The container, whose entry names reach a filesystem call in every consumer.
     try:
-        delivered = receipt_json_bytes(fixture)
-    except (zipfile.BadZipFile, KeyError) as error:
-        if not isinstance(error, KeyError) and checks.get("container.readable", "pass") != "fail":
-            return (["this fixture is not a container, and the kit records no container.readable failure"], "skipped")
-        return ([], "skipped")
+        entries = container.entries_of(fixture)
+    except zipfile.BadZipFile:
+        entries = None
+    statuses["container.readable"] = "pass" if entries is not None else "fail"
+    if entries is None:
+        return (compare(fill(statuses), checks), _outcome(statuses, checks))
+
+    # 2. The claim.
+    delivered = entries.get("receipt.json")
+    if delivered is None:
+        return (compare(fill({**statuses, "manifest.present": "fail"}), checks), _outcome(statuses, checks))
+    statuses["manifest.present"] = "pass"
 
     try:
         manifest = parse_manifest(delivered)
     except (NotCanonical, UnicodeDecodeError, json.JSONDecodeError) as error:
-        if checks.get("manifest.parseable", "pass") == "fail":
-            return ([], "skipped")
-        return (["the claim could not be parsed: %s" % error], "skipped")
-
+        if checks.get("manifest.parseable", "pass") != "fail":
+            return (["the claim could not be parsed: %s" % error], "agreed")
+        return (compare(fill({**statuses, "manifest.parseable": "fail"}), checks), _outcome(statuses, checks))
     if not isinstance(manifest, dict):
-        return (["the claim is not a JSON object, and the kit records no failure for that"], "skipped")
+        return (["the claim is not a JSON object, and the kit records no failure for that"], "agreed")
+    statuses["manifest.parseable"] = "pass"
 
-    # Gate one: the specification version. A major this implementation does not read stops here, which is why
-    # the record for that vector has no claim hash and `manifest.canonical: not_checked`.
+    def finish(statuses: dict, derived: str | None) -> tuple[list[str], str]:
+        """Add the attribution checks, which run whenever a claim parsed - however the claim itself went."""
+        statuses.update(signature_statuses(manifest, derived))
+        return (compare(fill(statuses), checks), _outcome(statuses, checks))
+
     version = manifest.get("spec_version")
-    if not isinstance(version, str) or not re.match(r"^\d+\.\d+\.\d+$", version):
-        if checks.get("manifest.spec_version", "pass") == "fail":
-            return ([], "skipped")
-        return (["spec_version is missing or not a semantic version, and the kit records no failure"], "skipped")
-    if version.split(".")[0] != "0":
-        if checks.get("manifest.spec_version", "pass") == "fail":
-            return ([], "skipped")
-        return (["this implementation reads 0.x and the claim is %s" % version], "skipped")
+    if not isinstance(version, str) or not re.match(r"^\d+\.\d+\.\d+$", version) \
+            or version.split(".")[0] != "0":
+        return finish({**statuses, "manifest.spec_version": "fail"}, None)
+    statuses["manifest.spec_version"] = "pass"
 
-    # Gate two: the canonical form, and the claim hash derived from it. `-0` is checked on the raw bytes,
-    # because parsing has already lost it (see `refuses_minus_zero`).
-    if refuses_minus_zero(delivered):
-        if expected_hash is not None:
-            return (["this claim contains `-0`, and the kit records a claim hash"], "refused")
-        if checks.get("manifest.canonical", "pass") != "fail":
-            return (["this claim contains `-0`, and the kit records no failure"], "refused")
-        return ([], "refused")
-
+    # 3. The canonical form, the claim hash derived from it, and - section 5.3 - the fixed point it must be.
+    #    Two different things can go wrong here, and they differ in what happens next. A claim with *no*
+    #    canonical form is not a claim this format admits, so everything below it stops. A claim that *could*
+    #    be canonicalised but was not delivered that way is `manifest.canonical: fail` and carries on: the
+    #    claim hash is derived from the parsed value, so an attribution check and a capture check are still
+    #    possible, and the reference reports them. Collapsing those two into one is what this implementation
+    #    did first, and the kit caught it on `claim-not-canonical`.
     try:
-        derived = claim_hash(manifest)
-    except NotCanonical as error:
-        if expected_hash is not None:
-            return (["this claim has no canonical form (%s), and the kit records a claim hash" % error], "refused")
-        if checks.get("manifest.canonical", "pass") != "fail":
-            return (["this claim has no canonical form (%s), and the kit records no failure" % error], "refused")
-        # Refused, and the record agrees that it should be. That is a corroboration, not a pass by silence.
-        return ([], "refused")
+        once = canonicalise(manifest)
+    except NotCanonical:
+        return finish({**statuses, "manifest.canonical": "fail"}, None)
 
-    problems: list[str] = []
-    if expected_hash is None:
-        problems.append("the kit records no claim hash, and this claim canonicalises fine")
-    elif derived != expected_hash:
-        problems.append("claim hash: derived %s, kit says %s" % (derived, expected_hash))
+    # `-0` is the same shape of problem: the reference's canonicaliser refuses it on the parsed value, so it
+    # stops the claim stage exactly as an uncanonicalisable claim does. This implementation finds it on the
+    # raw bytes (Python's parser has already turned `-0` into `0`), and treats it the same way.
+    if refuses_minus_zero(delivered):
+        return finish({**statuses, "manifest.canonical": "fail"}, None)
 
-    # The signature, whose message is the claim hash this implementation just derived - which is what makes
-    # this an Ed25519 check rather than a library call with a known-good input.
-    for check_id, status in signature_statuses(manifest, derived).items():
+    statuses["manifest.canonical"] = "pass" if once.encode("utf-8") == delivered else "fail"
+    statuses["claim.digest"] = "pass" if canonicalise(json.loads(once)) == once else "fail"
+
+    derived = claim_hash(manifest)
+    if derived != expected_hash:
+        # The claim stage ran and derived something else, which is this implementation's disagreement with
+        # the record rather than the record's - so it is reported rather than smoothed over.
+        return (
+            ["claim hash: derived %s, kit says %s" % (derived, expected_hash)],
+            _outcome(statuses, checks),
+        )
+
+    # 4. The shape and the capture, then the attribution checks. A claim that failed the canonical form still
+    #    gets its capture checked - only a *shape* failure stops the capture stage - and the signature never
+    #    depended on the claim being sound at all.
+    statuses.update({
+        key: value for key, value in container.container_statuses(entries, manifest).items()
+        if key != "container.readable"
+    })
+    return finish(statuses, derived)
+
+
+def _outcome(statuses: dict, checks: dict) -> str:
+    """`refused` when the only thing this implementation concluded is that the claim has no canonical form."""
+    canonical = statuses.get("manifest.canonical")
+    if canonical == "fail" and checks.get("manifest.canonical", "pass") == "fail":
+        return "refused"
+    return "agreed"
+
+
+def compare(statuses: dict, checks: dict) -> list[str]:
+    """Every modelled check whose status differs from the record's. An absent record entry means `pass`."""
+    problems = []
+    for check_id, status in statuses.items():
         recorded = checks.get(check_id, "pass")
         if status != recorded:
             problems.append(
                 "%s: this implementation says %s, and the kit says %s" % (check_id, status, recorded)
             )
-
-    expected_canonical = checks.get("manifest.canonical", "pass")
-    try:
-        whole = canonicalise(manifest).encode("utf-8")
-    except NotCanonical as error:
-        if expected_canonical != "fail":
-            problems.append("this claim cannot be canonicalised (%s), and the kit records no failure" % error)
-    else:
-        actual_canonical = "pass" if whole == delivered else "fail"
-        if actual_canonical != expected_canonical:
-            problems.append(
-                "manifest.canonical: this implementation says %s, and the kit says %s"
-                % (actual_canonical, expected_canonical)
-            )
-
-    return (problems, "agreed")
+    return problems
 
 
 def main(argv: list[str]) -> int:
@@ -447,10 +491,8 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print(
-        "this implementation covers the canonical form, the claim hash and the signature family"
-    )
-    print("(6 of the 21 checks); see conformance/README.md")
+    print("this implementation covers 17 of the 21 checks: the container, the claim, the claim hash and")
+    print("the signature family; see conformance/README.md")
     return 0 if failures == 0 else 1
 
 

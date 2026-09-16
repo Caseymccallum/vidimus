@@ -738,9 +738,9 @@ Three decisions about how it was done, which matter more than what it covered:
 1. **Written from the specification, not from the reference.** The rules came from sections 5, 5.1, 5.2 and
    6.1. Where the two disagreed, the disagreement was the finding rather than something to silently match -
    and there were three of them, all now fixed in the specification (below).
-2. **One layer, complete, and named as partial.** It implements 6 of the 21 checks and says so in its own
-   output; `conformance/README.md` states that it must not be listed as a conforming implementation. A
-   second implementation that quietly covered half the table would be worse than none, because "agreement"
+2. **One layer at a time, complete, and named as partial.** It implements 17 of the 21 checks and says so in
+   its own output; `conformance/README.md` states that it must not be listed as a conforming implementation.
+   A second implementation that quietly covered half the table would be worse than none, because "agreement"
    would then mean less than it sounds like.
 3. **It reports what it did not reach, by name.** Four vectors stop at a gate (a fixture that is not a
    container, a claim that does not parse, an unknown `spec_version`), and two are refused. Those are
