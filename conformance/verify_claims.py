@@ -275,6 +275,7 @@ MODELLED_CHECKS = (
     "signature.key_id",
     "signature.verify",
     "anchor.present",
+    "anchor.verified",
 )
 
 
@@ -391,6 +392,10 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     checks = vector["verdict"]["checks"]
     expected_hash = vector["verdict"]["claim_hash"]
 
+    # The caller's configuration, which the kit's README says a conformance run has to supply: a pinned TSA
+    # for an RFC 3161 anchor, the neighbouring receipt for a chain link.
+    options = vector.get("options") or {}
+
     raw_fixture = fixture.read_bytes()
     actual_digest = hashlib.sha256(raw_fixture).hexdigest()
     if actual_digest != vector["fixture"]["sha256"]:
@@ -430,11 +435,15 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
         """Add the attribution and anchor checks, which run whenever a claim parsed.
 
         A claim that failed its own stage still says who signed it and what it is anchored to, and the record
-        reports both - so these run however the claim itself went. Only the anchor check is modelled here;
-        `anchor.verified` is not, and is simply absent from the comparison.
+        reports both - so these run however the claim itself went. The anchor checks need the signature's
+        verdict (a chain anchor commits to a position at signing time, D-012) and the claim hash (an RFC 3161
+        token's imprint is compared against it), so they come last.
         """
-        statuses.update(signature_statuses(manifest, derived))
-        statuses.update(anchor.anchor_statuses(manifest))
+        signature = signature_statuses(manifest, derived)
+        statuses.update(signature)
+        statuses.update(anchor.anchor_statuses(
+            manifest, options, derived, signature["signature.verify"],
+        ))
         return (compare(fill(statuses), checks), _outcome(statuses, checks))
 
     version = manifest.get("spec_version")
@@ -549,8 +558,8 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers 19 of the 21 checks: the container, the claim, the claim hash, the")
-    print("capture's document, the signature family and whether an anchor is present; see conformance/README.md")
+    print("this implementation covers 20 of the 21 checks: everything except the text fingerprint;")
+    print("see conformance/README.md")
     return 0 if failures == 0 else 1
 
 

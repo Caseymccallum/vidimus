@@ -12,21 +12,30 @@ corroboration."* This directory is the beginning of that, and it is deliberately
 | `verify_claims.py` | The container, the claim, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 3, 5, 6, 7 and 12) rather than from `reference/`. No dependencies beyond the standard library. |
 | `container.py` | Reading a receipt's ZIP, the names inside it, and the WACZ capture it names - including the resource hashes the capture advertises for itself. |
 | `warc.py` | The record layer: the magic that separates records, the HTTP block, the WARC-Payload-Digest a record states for itself, and the body cut to the length the response declares. The smallest reader that can answer one question - what was the main document (section 4.2). |
-| `anchor.py` | `anchor.present`, and only that: whether the claim carries an anchor and whether its type is one this implementation knows (sections 7.4, 8.1, 8.3). |
+| `anchor.py` | Both anchor checks: the chain links of section 8.2, and the RFC 3161 tokens of section 8.3. |
+| `der.py`, `x509.py`, `rfc3161.py` | A DER reader, the four fields this project needs from a certificate, and the four things section 8.3 requires before a token may be reported as `pass` - including RSA PKCS#1 v1.5 verification by modular exponentiation. |
 | `ed25519.py` | Ed25519 verification, written from RFC 8032. Python's standard library has none, and checking a signature with the same library in two languages would be one check rather than two. |
 
-It covers **19 of the 21 checks**: everything except `anchor.verified` and `subject.text`.
+It covers **20 of the 21 checks**: everything except `subject.text`, the `text-v1` fingerprint, which needs an
+extractor rather than a rule.
 
-**One of those layers is a weaker check than the others, and it is worth saying which.** The container, the
+**Two of those layers are weaker checks than the others, and it is worth saying which.** The container, the
 claim and the signature layers were written from `docs/RECEIPT-SPEC.md` alone, with `reference/` unopened -
-that is what makes them corroboration. `warc.py` was not: section 9 delegates WARC semantics to ISO 28500
-("the verifier reads the response record for `subject.url` and the body after its HTTP headers, and nothing
-else"), which does not say how records are separated, how a stated `Content-Length` is treated, or whether a
-record's own `WARC-Payload-Digest` is honoured. So that layer was written with the reference in view, and it
-corroborates *understanding of the reference's behaviour* rather than of the specification's text. The
-vectors still make it worth having - it is a second implementation of the same rules, in a different
-language, over 14 fixtures - but it is not the same class of evidence, and calling it the same would be the
-kind of overstatement this project is arranged against.
+that is what makes them corroboration. Two were not:
+
+- `warc.py`, because section 9 delegates WARC semantics to ISO 28500 ("the verifier reads the response record
+  for `subject.url` and the body after its HTTP headers, and nothing else"), which does not say how records
+  are separated, how a stated `Content-Length` is treated, or whether a record's own `WARC-Payload-Digest` is
+  honoured;
+- `rfc3161.py`, because section 8.3 states the *rules* completely - trust first, then the extended key usage,
+  the validity window, the two CMS bindings, the imprint - and says nothing about the *order* they are applied
+  in, nor which of them is a `fail` and which an `unsupported`. The order came from `verify.mjs` and
+  `rfc3161.mjs`; the rules came from the specification.
+
+Both still make the vectors worth having - a second implementation, in a different language, over the same
+fixtures - but they corroborate *understanding of the reference's behaviour* rather than of the
+specification's text, and calling them the same would be the kind of overstatement this project is arranged
+against.
 
 ```bash
 node reference/src/vectors.mjs --emit ./kit        # the fixtures and the answers
@@ -43,13 +52,20 @@ claim hashes: 42 of 45 fixtures agree
 
 Every check this implementation models has, for every fixture, the status the reference recorded — including
 the Ed25519 signatures, verified with arithmetic written from RFC 8032 over a message built from the claim
-hash this implementation derived itself, against a platform library on the other side. The three refusals are
-claims the format does not admit (a float, a `-0`, a version this implementation does not read), and the
-record agrees that they are refused.
+hash this implementation derived itself, and including an **RFC 3161 timestamp token**: its CMS structure, its
+certificate, the two signed-attribute bindings, the `messageImprint` against the claim hash, and an RSA
+PKCS#1 v1.5 signature verified by modular exponentiation, against a platform library on the other side. The
+three refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not
+read), and the record agrees that they are refused.
+
+Every status each check can produce is exercised across those 45 fixtures: all four of `anchor.verified`
+(`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, and both the refusals and the
+stage gaps of the claim checks. A conformance run that only ever saw the happy path would agree with a
+reference that did nothing.
 
 ## What writing it found
 
-Seven things that only showed up when somebody implemented the format somewhere else. Two are fixed in the
+Eight things that only showed up when somebody implemented the format somewhere else. Two are fixed in the
 specification; the rest are named as open, because a list that reads as if it were closed is worse than no
 list at all.
 
@@ -81,6 +97,15 @@ list at all.
    list from a principle, and this implementation guessed at `MAX_ENTRY_NAME` rather than reading it. **The
    specification should state the list.**
 
+8. **What a timestamp token's signature covers is not stated.** Section 8.3 lists the CMS bindings a token
+   must carry - the signed attributes must name the `TSTInfo`, and must carry its digest - and says nothing
+   about the fact that what is *signed* is those attributes **re-tagged** as a `SET OF`: the same bytes after
+   the tag that identifies them, length octets included. My first version reconstructed them from the `[0]`
+   element's *value*, which silently drops the length octets and produces a shorter byte string. The result
+   was `anchor.verified: fail` on a perfectly good token, with everything else - the certificate, the imprint,
+   the key usage, the validity window - checking out. The vectors caught it in one run, and an implementer with
+   no vectors would have concluded the TSA was lying.
+
 And two about *when* checks run, which the specification states as a principle and an implementer needs as a
 picture. Both were reported by the kit as disagreements, and both were this implementation's fault:
 
@@ -105,12 +130,9 @@ second implementer can follow without asking anybody anything.
 ## What this is not
 
 **It is not a conforming implementation, and it must not be listed as one.** Section 11 requires every check
-in section 7.4: this implements 19 of the 21, and the two it does not — `anchor.verified` and `subject.text` —
-are the two that need machinery rather than rules.
+in section 7.4: this implements 20 of the 21, and the one it does not — `subject.text` — needs a `text-v1`
+extractor (section 4.5), which is a different kind of work from everything above.
 
-The next slice is **`anchor.verified`**, which is the largest single piece left: DER parsing, an X.509
-certificate and its `timeStamping` extended key usage, RSA signature verification by modular exponentiation,
-the CMS signed attributes that bind the signature to the `TSTInfo`, and the token's own `messageImprint`
-compared against the claim hash — all four of section 8.3's steps, where getting three of them right and
-answering "yes" early is the failure section 8.3 was written to prevent. After that, `subject.text` needs a
-`text-v1` extractor (section 4.5), which is a different kind of work again.
+Writing it went from 2 checks to 20 in four slices, and the shape of what remains is the interesting part:
+every check that could be decided from the bytes has been, and the last one cannot be, because it asks what
+the *words* are.
