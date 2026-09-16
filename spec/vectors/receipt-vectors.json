@@ -1907,8 +1907,8 @@
       "proves": "an unknown profile is neither a pass nor a failure: the bytes are checked, the meaning is caveated, and the receipt stays verified on integrity and attribution",
       "fixture": {
         "file": "capture-profile-unrecognised.receipt",
-        "sha256": "b53d38cda725765b1fe9f4ac32bda303117249aedc95dd1a5952b42225f2963a",
-        "bytes": 2243
+        "sha256": "04a2d83f065971692eea8cb62ece4540943c9475b7e1a35fb38696ce491ff041",
+        "bytes": 2262
       },
       "options": {},
       "expect": {
@@ -1926,6 +1926,52 @@
       "verdict": {
         "verified": true,
         "exit_code": 0,
+        "claim_hash": "6c506fe538e25deeb7c724b1503303b6ee321f870d7b7171b9c3826375bdc2bf",
+        "capture_profile": "capture-from-the-future-v9",
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-profile-wire",
+      "description": "a capture that declares itself the bytes a server sent",
+      "proves": "a *recognised* profile is reported without a caveat, so the caveat above means \"unknown\" rather than \"declared\"",
+      "fixture": {
+        "file": "capture-profile-wire.receipt",
+        "sha256": "b53d38cda725765b1fe9f4ac32bda303117249aedc95dd1a5952b42225f2963a",
+        "bytes": 2243
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {},
+        "caveats": 1
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
         "claim_hash": "440e15315a4058b9c29815d977a7160f2d6f443907a3ddf065f4499b94d80dd6",
         "capture_profile": "wire-v1",
         "levels": {
@@ -1939,7 +1985,7 @@
           "key_trusted": "not_checked"
         },
         "time_bound": "claimed_only",
-        "caveat_count": 2,
+        "caveat_count": 1,
         "checks": {
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",

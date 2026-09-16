@@ -694,7 +694,10 @@ export const CASES = [
     proves: 'an unknown profile is neither a pass nor a failure: the bytes are checked, the meaning is caveated, and the receipt stays verified on integrity and attribution',
     build: () => buildReceipt({
       manifestPatch: (manifest) => {
-        manifest.capture.profile = 'wire-v1';
+        // A profile from a future version, deliberately not one this verifier knows. (This case used to
+        // name `wire-v1`, which was unrecognised when it was written and became recognised later - so it
+        // silently stopped testing what it said it tested. The vectors caught it, which is their job.)
+        manifest.capture.profile = 'capture-from-the-future-v9';
       },
     }).bytes,
     expect: {
@@ -703,6 +706,23 @@ export const CASES = [
       levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
       checks: {},
       caveats: 2,
+    },
+  },
+  {
+    id: 'capture-profile-wire',
+    description: 'a capture that declares itself the bytes a server sent',
+    proves: 'a *recognised* profile is reported without a caveat, so the caveat above means "unknown" rather than "declared"',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        manifest.capture.profile = 'wire-v1';
+      },
+    }).bytes,
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: {},
+      caveats: 1,
     },
   },
 ];

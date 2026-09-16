@@ -40,6 +40,10 @@ import { signClaim } from './keys.mjs';
  *
  * @param {{
  *   facts: PageFacts,
+ *   resources?: Array<{
+ *     url: string, status: number, statusText?: string,
+ *     contentType?: string | null, headers?: Array<[string, string]>, body: Uint8Array,
+ *   }>,
  *   key?: { pkcs8: Uint8Array, publicRaw: Uint8Array, signer?: string | null } | null,
  *   anchor?: Record<string, any>,
  * }} input
@@ -58,6 +62,9 @@ export async function sealPage(input) {
     headers: facts.headers,
     html: facts.html,
     capturedAt: facts.capturedAt,
+    // The files the document referenced, when the caller went and got them. They travel in the same
+    // archive as the document, addressed by their own URLs.
+    resources: input.resources ?? [],
   });
 
   const draft = draftClaim({

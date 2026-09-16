@@ -121,7 +121,12 @@ function concat(parts) {
  * @returns {Uint8Array}
  */
 function buildHttpBlock({ status, statusText, headers, body }) {
-  const bodyBytes = utf8(body);
+  const bodyBytes = typeof body === 'string' ? utf8(body) : body;
+  if (!(bodyBytes instanceof Uint8Array)) {
+    // Named rather than left to fail on `.length`, which is what it used to do: a record with no body
+    // produced a payload containing the word "undefined", and a reader would have accepted it.
+    throw new CaptureError('a record needs a body: a string of text, or a block of bytes');
+  }
   const lines = [`HTTP/1.1 ${status}${statusText === '' ? '' : ` ${statusText}`}`];
   for (const [name, value] of headers) lines.push(`${name}: ${value}`);
   lines.push(`Content-Length: ${bodyBytes.length}`);
@@ -199,16 +204,48 @@ export function buildCapture(input) {
   }
 
   const finalUrl = input.finalUrl ?? input.url;
-  const record = buildWarcRecord({
-    url: finalUrl,
-    status: input.status,
-    statusText: input.statusText ?? '',
-    headers: input.headers,
-    capturedAt: input.capturedAt,
-    body: input.html,
-  });
+  const extraResources = input.resources ?? [];
 
-  const warc = storeGzip(record);
+  const seen = new Set([finalUrl]);
+  for (const resource of extraResources) {
+    if (seen.has(resource.url)) {
+      throw new CaptureError(
+        `the capture already holds ${resource.url}: two records for one address would make it `
+        + 'ambiguous which of them is the document',
+      );
+    }
+    seen.add(resource.url);
+  }
+
+  // One record for the document, then one for each file it referenced. All of them live in the one
+  // archive file, which is what a WACZ is: a ZIP whose `archive/` holds concatenated, individually
+  // gzipped WARC records. A reader looks a URL up by its record, and a replay tool intercepts a
+  // subresource request by the address it was made to - so nothing in the document has to be rewritten.
+  const records = [
+    {
+      url: finalUrl,
+      status: input.status,
+      statusText: input.statusText ?? '',
+      headers: input.headers,
+      body: input.html,
+    },
+    ...extraResources.map((resource) => ({
+      url: resource.url,
+      status: resource.status,
+      statusText: resource.statusText ?? '',
+      headers: resource.headers,
+      body: resource.body,
+    })),
+  ];
+
+  const warc = concat(records.map((record) => storeGzip(buildWarcRecord({
+    url: record.url,
+    status: record.status,
+    statusText: record.statusText,
+    headers: record.headers,
+    capturedAt: input.capturedAt,
+    body: record.body,
+  }))));
   const warcPath = 'archive/data.warc.gz';
   const dataPackage = canonicalise({
     profile: 'data-package',
@@ -231,8 +268,18 @@ export function buildCapture(input) {
   const html = utf8(input.html);
   return {
     wacz,
-    record,
+    record: buildWarcRecord({
+      url: finalUrl,
+      status: input.status,
+      statusText: input.statusText ?? '',
+      headers: input.headers,
+      capturedAt: input.capturedAt,
+      body: input.html,
+    }),
     document: { sha256: toHex(sha256(html)), bytes: html.length },
+    // How many files a capture holds is answerable from the capture itself, so it needs no field in the
+    // claim: a reader with the file can count the records, and a replay tool can list them.
+    resources: records.length,
     // What this module makes, named: a document as the browser rendered it. A claim that carries this
     // can be told apart from one that holds the bytes a server sent, which is the difference a reader
     // deciding whether to rely on it actually needs (section 4.4 of the specification).

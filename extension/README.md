@@ -25,11 +25,13 @@ the two producers cannot drift apart (D-018).
 - **It reads containers the way they come**: stored or deflated, so a receipt written by another tool is
   checked here as well as on the command line. What it cannot read it refuses by name - ZIP64, encrypted
   entries, an unknown compression method - and the check reports `unsupported` rather than pretending.
+- **It captures the document and the files it references** - the stylesheets and images, addressed by
+  their own URLs, which is what a WACZ-aware replayer looks up when it serves them from the archive.
+  There are limits (40 files, 2 MB each, 8 MB in total), and the popup tells you how many were kept and
+  how many were left out rather than folding the difference into a receipt quietly.
 - **It says what kind of capture it holds.** Its claims declare `capture.profile: "document-v1"` - the
   document as the browser rendered it. That is a different claim from one holding the bytes a server
   sent, and a reader deciding whether a receipt is good enough now has a way to tell the two apart.
-- **It does not capture the stylesheets and images** around the document. The capture is the document
-  itself, and the profile above is where that is written down.
 - **It asks for `<all_urls>`.** That host permission is what makes a response status observable; without
   it the claim would carry no `status` and no `content_type` (both optional in the format). A real trade,
   and the first one to revisit.
@@ -37,8 +39,10 @@ the two producers cannot drift apart (D-018).
 ## Permissions
 
 Every permission carries a written reason in [`permissions.mjs`](permissions.mjs), the manifest is built
-from that file, and a test fails if a permission appears without one. There is no analytics, no remote
-code, and no network request of this extension's own.
+from that file, and a test fails if a permission appears without one. There is no analytics and no remote
+code. The only requests the extension makes are the ones that gather the files a capture holds: they go
+to the page's own sources, they are made when you press the button and not before, and the popup tells you
+how many succeeded.
 
 | Permission | Why |
 | --- | --- |

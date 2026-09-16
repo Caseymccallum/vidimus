@@ -201,12 +201,26 @@ verifier that only counts bytes:
   describe a wire representation removed (`Content-Length`, `Content-Encoding`,
   `Transfer-Encoding`). This is what a Manifest V3 extension can honestly capture, because it cannot
   read the body of a response the page made.
-- **the bytes the server sent** — a WARC response record whose payload is what came over the wire,
-  which is what crawling tools produce.
+- **`wire-v1`** — a WARC response record whose payload is what came over the wire, with the transport
+  headers as they arrived. Nothing was rendered and nothing was removed, which makes it the richer claim
+  of the two: it is what the server sent rather than what the browser made of it. Crawling tools produce
+  captures of this kind.
 
 Those are not the same claim. "Here is what the page said to me, as it rendered" and "here is what the
 server sent" differ whenever a page is assembled by scripts, and a reader deciding whether a receipt is
 good enough for their purpose needs to know which one they are holding.
+
+A producer **MUST NOT** declare a profile it cannot support, and **MUST** omit the field when it does not
+know. **Nothing in a capture reveals which of these it holds** - that is precisely why the field exists -
+so a tool sealing somebody else's capture has no way to find out, and a guess would be a falsehood inside
+a signature. `vidimus seal` therefore writes no profile unless the caller names one, and the extension
+writes `document-v1` because it built the capture itself.
+
+A capture may hold more than the document: the files it references - stylesheets, images - travel in the
+same archive, each as its own record addressed by its own URL, which is what a replay tool looks a
+subresource up by. **How much a capture holds is answerable from the capture**, so no field of the claim
+describes it: a reader with the file can count the records. The `document` digest describes the document
+and only the document, whatever else is in there beside it.
 
 So `capture.profile` names it. The field is **optional**, and absence is a fact rather than a defect:
 it means the producer is not saying, which is the honest position for a tool that captured a WACZ

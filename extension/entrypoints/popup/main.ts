@@ -117,6 +117,72 @@ function fail(text: string): void {
   if (button) button.disabled = false;
 }
 
+/** Limits, so that a capture stays something a person can attach to a citation. */
+const MAX_RESOURCES = 40;
+const MAX_RESOURCE_BYTES = 2 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
+
+interface Resource {
+  url: string;
+  status: number;
+  statusText: string;
+  contentType: string | null;
+  headers: Array<[string, string]>;
+  body: Uint8Array;
+}
+
+/**
+ * The files the document referenced, fetched so the capture can hold them.
+ *
+ * This is the one place where the extension makes a request of its own, and it is worth being plain about
+ * it: the browser will not hand over the body of a response the *page* made, so a capture that wants the
+ * stylesheet and the images has to ask for them. They are fetched again, so what is captured is what the
+ * server sends now - which is why the count of files kept and left out is reported to the user rather
+ * than folded silently into the receipt.
+ *
+ * Anything that cannot be fetched, is too large, or returns an error is **left out and counted**. A
+ * capture that quietly drops half a page is worse than one that says how much it holds.
+ *
+ * @returns The resources to capture, and how many were left out.
+ */
+async function collectResources(urls: string[]): Promise<{ resources: Resource[]; skipped: number }> {
+  const resources: Resource[] = [];
+  let skipped = 0;
+  let total = 0;
+
+  for (const url of urls) {
+    if (resources.length >= MAX_RESOURCES || total >= MAX_TOTAL_BYTES) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) {
+        skipped += 1;
+        continue;
+      }
+      const body = new Uint8Array(await response.arrayBuffer());
+      if (body.length > MAX_RESOURCE_BYTES || total + body.length > MAX_TOTAL_BYTES) {
+        skipped += 1;
+        continue;
+      }
+      total += body.length;
+      resources.push({
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type'),
+        headers: [...response.headers.entries()],
+        body,
+      });
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  return { resources, skipped };
+}
+
 async function seal(): Promise<void> {
   if (tabId === null) {
     fail('There is no page to seal.');
@@ -138,13 +204,27 @@ async function seal(): Promise<void> {
 
     const [injected] = await browser.scripting.executeScript({
       target: { tabId },
-      func: () => document.documentElement.outerHTML,
+      func: () => ({
+        html: document.documentElement.outerHTML,
+        // The document, and the files it points at. Anything the page assembles at runtime and does not
+        // reference by URL is beyond a capture of this kind, and the profile says which kind it is.
+        urls: [...new Set([
+          ...[...document.querySelectorAll('link[rel="stylesheet"]')]
+            .map((element) => (element as HTMLLinkElement).href),
+          ...[...document.querySelectorAll('img[src]')]
+            .map((element) => (element as HTMLImageElement).src),
+        ])].filter((url) => url !== ''),
+      }),
     });
-    const html = typeof injected?.result === 'string' ? injected.result : '';
+    const page = injected?.result as { html: string; urls: string[] } | undefined;
+    const html = typeof page?.html === 'string' ? page.html : '';
     if (html === '') {
       fail('This page has no document to capture.');
       return;
     }
+
+    if (note) note.textContent = 'Fetching the files this page uses…';
+    const { resources, skipped } = await collectResources(page?.urls ?? []);
 
     const key = await loadKey();
     const sealed = await sealPage({
@@ -158,6 +238,7 @@ async function seal(): Promise<void> {
         html,
         capturedAt: utcSecond(),
       },
+      resources,
       key,
     });
 
@@ -179,9 +260,14 @@ async function seal(): Promise<void> {
     say([
       ...verdict.summary,
       '',
+      `files     ${resources.length} kept${skipped > 0 ? `, ${skipped} left out` : ''}`,
       `file      ${name}`,
     ].join('\n'));
-    if (note) note.textContent = `Signed and checked here. vidimus verify ${name} checks it elsewhere.`;
+    if (note) {
+      note.textContent = skipped > 0
+        ? `Signed and checked here. ${skipped} file(s) could not be fetched, so this capture does not hold them.`
+        : `Signed and checked here. vidimus verify ${name} checks it elsewhere.`;
+    }
   } catch (error) {
     fail(`Could not seal this page: ${error instanceof Error ? error.message : String(error)}`);
   } finally {

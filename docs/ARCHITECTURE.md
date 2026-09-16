@@ -374,6 +374,33 @@ specification (section 4.4.1) where an implementer will meet them:
 **Rejected:** a check (above), and a *required* field - which would invalidate every receipt already
 written and would force a sealer of foreign captures to guess at something it cannot see.
 
+### D-023 - A capture can hold the document's files, and the claim says nothing about them
+
+A capture is one archive file holding several WARC records: the document, then a record for each file it
+referenced. That is what a WACZ already is - concatenated, individually gzipped records under `archive/` -
+so the format needed no change at all, which is the whole return on having adopted it (D-001). A reader
+finds a URL by its record, a replay tool intercepts a subresource request by the address it was made to,
+and nothing in the document has to be rewritten.
+
+Two decisions inside the implementation:
+
+1. **A record's body may be bytes, not text.** An image is not a string, and a capture that mangles one is
+   worse than a capture without it. That change also surfaced a silent wrongness: the HTTP block builder
+   used to hand whatever it was given to a text encoder, so a record with no body produced a payload
+   containing the word `undefined` - which a reader accepted and a claim would have described. It refuses
+   by name now, and a test says so.
+2. **Two records for one address are refused.** A capture holding the same URL twice would be ambiguous
+   about which of them is the document, and a reader would pick one arbitrarily.
+
+**The claim gains no field for this, deliberately.** How much a capture holds is answerable *from the
+capture* - a reader with the file can count the records - so putting it in a signed claim would create a
+second source of truth for something already answerable. What the claim says, as ever, is the one digest:
+the document, and only the document, whatever travels beside it.
+
+The extension gathers the files by **fetching them again**, and reports how many it kept and left out,
+because a browser will not hand over the body of a response the page made. Those fetches are the only
+requests the extension makes, and `extension/README.md` says so in the same breath as the permission table.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

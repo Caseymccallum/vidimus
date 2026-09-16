@@ -86,7 +86,7 @@ export const CHECKS = [
  * whatever it holds, and what it holds is not something a verifier can work out for itself. See section
  * 4.4 of the specification, which also explains why this is not a check.
  */
-export const KNOWN_CAPTURE_PROFILES = new Set(['document-v1']);
+export const KNOWN_CAPTURE_PROFILES = new Set(['document-v1', 'wire-v1']);
 
 /** Levels, in order, with what each one is allowed to mean. */
 export const LEVELS = [

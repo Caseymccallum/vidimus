@@ -1,19 +1,70 @@
 ﻿=====
-not ok 34 - a container this verifier cannot read is unsupported, not failed
+not ok 23 - the record it writes is one the reader would accept on its own
   ---
-  duration_ms: 2.089
+  duration_ms: 0.5181
   type: 'test'
-  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\extension.test.mjs:148:1'
+  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\capture.test.mjs:144:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'length')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    buildHttpBlock (file:///C:/Users/Casey/Web%20Apps/Vidimus/reference/src/capture.mjs:127:43)
+    buildWarcRecord (file:///C:/Users/Casey/Web%20Apps/Vidimus/reference/src/capture.mjs:143:19)
+    TestContext.<anonymous> (file:///C:/Users/Casey/Web%20Apps/Vidimus/reference/test/capture.test.mjs:148:18)
+=====
+not ok 26 - a capture with resources seals into a receipt that still verifies
+  ---
+  duration_ms: 3.5306
+  type: 'test'
+  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\capture.test.mjs:203:1'
   failureType: 'testCodeFailure'
   error: |-
     Expected values to be strictly equal:
     + actual - expected
     
-    + 'unsupported'
-    - 'not_checked'
+    + undefined
+    - true
+    
+=====
+not ok 61 - every case still matches the expectation written down in cases.mjs
+  ---
+  duration_ms: 2.4484
+  type: 'test'
+  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\vectors.test.mjs:26:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   'capture-profile-unrecognised: expected 2 caveats, got 1'
+    + ]
+=====
+not ok 62 - the recorded vectors are exactly what the implementation produces now
+  ---
+  duration_ms: 1.4669
+  type: 'test'
+  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\vectors.test.mjs:30:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    a recorded answer moved. If the change is intended, re-record with `node reference/src/vectors.mjs --write` and say why in the commit.
+    + actual - expected
+    
+    + [
+    +   'vectors: expected 36 entries, got 37',
+    +   'vectors[35].verdict.caveat_count: expected 2, got 1',
+=====
+not ok 64 - the record carries the versions it was made with
+  ---
+  duration_ms: 0.299
+  type: 'test'
+  location: 'C:\\Users\\Casey\\Web Apps\\Vidimus\\reference\\test\\vectors.test.mjs:53:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    37 !== 36
     
   code: 'ERR_ASSERTION'
   name: 'AssertionError'
-  expected: 'not_checked'
-  actual: 'unsupported'
-  operator: 'strictEqual'
