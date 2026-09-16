@@ -140,14 +140,22 @@ second implementer can follow without asking anybody anything.
 
 ## What this is not
 
-**It is not a conforming implementation, and it must not be listed as one - yet, and for a new reason.**
-Section 11 requires every check in section 7.4, and this now implements all 21 of them and agrees with the
-record on every status it compares. What it does not do is produce a **verdict**: no `verified`, no level
-rollups, no capture profile, no attribution, no time bound, no caveat count, no exit code. The kit's README
-says a conformance run compares the verdict "field by field", and a run that compared only the checks would
-be claiming more than it tested.
+**It is not offered as a conforming implementation yet, and the reason is now narrow enough to be exact.**
+Section 11 says a conformance run compares the verdict "field by field". Of the nine fields the record
+carries, this compares five: `claim_hash`, `checks`, `levels`, `verified` and `exit_code`. It does not produce
+four:
 
-That is the next slice, and it is a small one: derive `levels` from the checks (section 7.3), `verified` from
-the levels, `exit_code` from `verified`, and compare those fields too. Until then this directory is evidence
-that the *rules* are implementable from the specification by somebody who did not write it - which is what it
-was for - and not yet evidence that an independent implementation can produce this project's output.
+- **`capture_profile`** — the declared profile and whether this verifier understands it (section 4.4);
+- **`attribution`** — the self-asserted `signer` name and whether a caller-supplied key directory vouches for
+  the key (section 6.7);
+- **`time_bound`** — `claimed_only`, or `attested_before` with the instant an anchor attests (section 8.4);
+- **`caveat_count`** — and this one is the interesting one. Every other field is a *rule* that can be
+  implemented from the specification; a caveat count is a number that depends on how many prose caveats the
+  implementation chose to raise, at every point where something was not checked. Two verifiers that agree on
+  all 21 checks, all four levels and `verified` can still disagree about this number, and neither of them is
+  wrong. A count is a strange thing to make conformant, and it is worth deciding whether section 11 should
+  ask for it.
+
+The first three are small. The fourth is the reason this directory still says "evidence that the rules are
+implementable from the specification by somebody who did not write it" rather than "a conforming
+implementation".

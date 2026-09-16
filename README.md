@@ -219,11 +219,12 @@ here because a format that cannot say what it grew out of is a format nobody can
 - **A second implementation — started.** `conformance/` is a Python implementation of all 21 checks of section
   7.4, written from the specification rather than from the reference, with Ed25519 from RFC 8032, a DER/X.509
   reader, an RFC 3161 token verifier and a `text-v1` extractor alongside it. It agrees with the record on 42
-  of 45 fixtures, corroborates 3 refusals, and disagrees on none — and it does not yet assemble a whole verdict
-  (`verified`, the level rollups, the profile, attribution, the time bound, the caveat count, the exit code), so
-  it is not listed as a conforming implementation (D-034, `conformance/README.md`). The fixtures ship for
-  anyone extending it: `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each one
-  must produce, and a README with the three steps (D-031).
+  of 45 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
+  `verified` and `exit_code`, agreeing there too. It is not offered as a conforming implementation because it
+  compares five of the verdict's nine fields: the capture profile, attribution, the time bound and a caveat
+  count are not produced (D-034, `conformance/README.md`). The fixtures ship for anyone extending it:
+  `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each one must produce, and a
+  README with the three steps (D-031).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
 - **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites.

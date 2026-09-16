@@ -436,6 +436,17 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
 
     statuses: dict[str, str] = {}
 
+    def report(statuses: dict) -> tuple[list[str], str]:
+        """Everything this implementation can compare for this vector: the checks and the rollup.
+
+        Defined before it is used, which sounds too obvious to say until a nested function is called from a
+        branch above its definition - which is exactly what happened here on the first attempt.
+        """
+        filled = fill(statuses)
+        problems = compare(filled, checks)
+        problems.extend(compare_verdict(filled, vector.get("verdict") or {}))
+        return (problems, _outcome(statuses, checks))
+
     # 1. The container, whose entry names reach a filesystem call in every consumer.
     try:
         entries = container.entries_of(fixture)
@@ -443,12 +454,12 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
         entries = None
     statuses["container.readable"] = "pass" if entries is not None else "fail"
     if entries is None:
-        return (compare(fill(statuses), checks), _outcome(statuses, checks))
+        return report(statuses)
 
     # 2. The claim.
     delivered = entries.get("receipt.json")
     if delivered is None:
-        return (compare(fill({**statuses, "manifest.present": "fail"}), checks), _outcome(statuses, checks))
+        return report({**statuses, "manifest.present": "fail"})
     statuses["manifest.present"] = "pass"
 
     try:
@@ -456,7 +467,7 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     except (NotCanonical, UnicodeDecodeError, json.JSONDecodeError) as error:
         if checks.get("manifest.parseable", "pass") != "fail":
             return (["the claim could not be parsed: %s" % error], "agreed")
-        return (compare(fill({**statuses, "manifest.parseable": "fail"}), checks), _outcome(statuses, checks))
+        return report({**statuses, "manifest.parseable": "fail"})
     if not isinstance(manifest, dict):
         return (["the claim is not a JSON object, and the kit records no failure for that"], "agreed")
     statuses["manifest.parseable"] = "pass"
@@ -476,7 +487,7 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
             manifest, options, derived, signature["signature.verify"],
         ))
         statuses.update(text_status(manifest, inner))
-        return (compare(fill(statuses), checks), _outcome(statuses, checks))
+        return report(statuses)
 
     version = manifest.get("spec_version")
     if not isinstance(version, str) or not re.match(r"^\d+\.\d+\.\d+$", version) \
@@ -540,6 +551,80 @@ def _outcome(statuses: dict, checks: dict) -> str:
     return "agreed"
 
 
+# Section 7.4, grouped by the level each check belongs to (section 7.3).
+LEVEL_CHECKS = {
+    "L0": (
+        "container.readable", "manifest.present", "manifest.parseable", "manifest.spec_version",
+        "manifest.canonical", "manifest.shape", "claim.digest", "capture.present", "capture.bytes",
+        "capture.digest", "capture.media_type", "capture.wacz.readable", "capture.wacz.resources",
+        "subject.document",
+    ),
+    "L1": ("signature.present", "signature.alg", "signature.key_id", "signature.verify"),
+    "L2": ("anchor.present", "anchor.verified"),
+    "L3": ("subject.text",),
+}
+
+# Section 7.3: `fail` outranks everything, then `unsupported`, then `not_checked`.
+LEVEL_PRECEDENCE = ("fail", "unsupported", "not_checked")
+
+
+def level_status(statuses: dict, level: str) -> str:
+    """One level's rollup: `pass` only when every check in it is `pass` (section 7.3).
+
+    No "pass with warnings", and no partial credit. A level whose checks are a mix of `pass` and
+    `not_checked` is `not_checked`, because the moment a partially examined level can print as verified the
+    level stops meaning anything - and `not_applicable` is not a pass either, or an unsigned claim would roll
+    L1 up to green.
+    """
+    values = [statuses.get(check, "not_checked") for check in LEVEL_CHECKS[level]]
+    if all(value == "not_applicable" for value in values):
+        return "not_applicable"
+    for status in LEVEL_PRECEDENCE:
+        if status in values:
+            return status
+    if "not_applicable" in values:
+        return "not_checked"
+    return "pass"
+
+
+def verdict_of(statuses: dict) -> dict:
+    """The rollup: the levels, `verified`, and the exit code (sections 7.3 and 7.5).
+
+    `verified` is true when **L0 is `pass`, L1 is `pass`, and no check anywhere is `fail`** - and nothing else
+    is folded in. An unanchored receipt is verified and its time is not attested; an unimplemented anchor does
+    not un-verify the bytes; a signer nobody can trace is still a signer. The exit code has three states
+    because "this receipt is broken" and "I could not check this receipt" must not share one in a pipeline.
+    """
+    levels = {level: level_status(statuses, level) for level in LEVEL_CHECKS}
+    any_fail = "fail" in statuses.values()
+    verified = levels["L0"] == "pass" and levels["L1"] == "pass" and not any_fail
+    return {
+        "levels": levels,
+        "verified": verified,
+        "exit_code": 2 if any_fail else (0 if verified else 1),
+    }
+
+
+def compare_verdict(statuses: dict, verdict: dict) -> list[str]:
+    """What the rollup disagrees with the record about - the fields section 11 asks for by name."""
+    expected = verdict_of(statuses)
+    problems = []
+    for field in ("verified", "exit_code"):
+        if field in verdict and expected[field] != verdict[field]:
+            problems.append(
+                "%s: this implementation says %s, and the record says %s"
+                % (field, expected[field], verdict[field])
+            )
+    recorded_levels = verdict.get("levels") or {}
+    for level, status in expected["levels"].items():
+        if level in recorded_levels and status != recorded_levels[level]:
+            problems.append(
+                "%s: this implementation rolls up to %s, and the record says %s"
+                % (level, status, recorded_levels[level])
+            )
+    return problems
+
+
 def compare(statuses: dict, checks: dict) -> list[str]:
     """Every modelled check whose status differs from the record's. An absent record entry means `pass`."""
     problems = []
@@ -590,9 +675,10 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers all 21 checks of section 7.4, and agrees with the record on")
-    print("every status it compares; it does not yet assemble a whole verdict, which section 11 wants")
-    print("field by field - see conformance/README.md")
+    print("this implementation covers all 21 checks of section 7.4 and rolls them up into `verified`,")
+    print("`exit_code` and the four levels; it does not yet produce the capture profile, attribution, the")
+    print("time bound or a caveat count, so it is not offered as a conforming implementation -")
+    print("see conformance/README.md")
     return 0 if failures == 0 else 1
 
 
