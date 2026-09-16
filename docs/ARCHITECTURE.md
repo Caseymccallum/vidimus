@@ -700,6 +700,31 @@ that was sound but not fully verified was deleted with "that is a bug in this pr
 which is that flag's entire purpose. A producer should refuse receipts that **fail** (exit 2) and hand over
 receipts that say what they are (exit 0 or 1). It now does, and says which.
 
+### D-033 - Timestamping is two steps, because the token cannot exist first
+
+A token is a response to a digest, so it cannot be inside the thing it commits to - which is why an `rfc3161`
+anchor is excluded from the signed subtree (section 6.1). What nobody had worked out is how a *user* is meant
+to obtain one: the claim hash a token must commit to was not obtainable without sealing first, and sealing with
+`{"type":"none"}` gives a **different** hash, because the anchor's **type** is inside the signed subtree while
+its **value** is not.
+
+So `seal --digest-only` prints the claim hash under a placeholder `rfc3161` anchor, and `seal --timestamp`
+writes the token in. Three notes:
+
+1. **The distinction is the whole trick, and it is easy to get wrong.** The first version of `--digest-only`
+   used `{"type":"none"}` and printed a digest nobody would ever sign. The library test passed - it used a
+   placeholder on *both* sides - and an end-to-end smoke test caught it. The test now asserts both halves: that
+   a real token leaves the hash alone, **and** that a `none` anchor does not.
+2. **The verifier needed no change at all.** A receipt sealed this way is an ordinary one carrying an anchor,
+   and it passes L2 when the TSA is pinned.
+3. **This is the first thing in the project a person performs by hand, in steps, with tools that are not
+   ours** - which is why it has its own document (`docs/TIMESTAMPING.md`) rather than a paragraph in the usage
+   text, and why that document says plainly that no live authority has ever been tried.
+
+**Rejected:** having `seal` fetch a token itself. That would mean a network request inside the producer, an
+endpoint to configure, and a receipt whose content depended on whether an authority was up - all to save one
+`openssl ts` invocation. D-005's reasoning, applied to the producer.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

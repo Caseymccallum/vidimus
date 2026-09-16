@@ -38,7 +38,7 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 164 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
+| `npm test` | 165 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
 | `node reference/src/vectors.mjs --emit <dir>` | Writes a conformance kit: the fixtures, the answers and a README saying what to do with them. Nothing in it needs this repository. |
@@ -46,7 +46,7 @@ npm run verify      # syntax, then tests, then the vectors
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. `--trusted-key`, `--key-directory` and `--tsa` are how a caller answers "whose key signed this?" and "whose timestamp is this?" (sections 6.7 and 8.3 of the specification). |
 | `node reference/src/cli.mjs keys <directory.json>` | Reads a key directory and says what is in it, refusing the entries it will not use rather than waiting for a receipt to fail against them. |
 | `node reference/src/cli.mjs check <file>` | The comparison with the page as it is now: the only command that makes a request, and the only one whose output includes a currency report. `--require-same-words` makes that report, rather than the receipt, decide the exit code. |
-| `node reference/src/cli.mjs seal <capture.wacz> --key <key.json>` | The producer: it builds a claim from a capture, signs it, and verifies its own output before reporting success (D-017). |
+| `node reference/src/cli.mjs seal <capture.wacz> --key <key.json>` | The producer: it builds a claim from a capture, signs it, and verifies its own output before reporting success (D-017). `--timestamp` attaches an RFC 3161 token, and `--digest-only` prints the claim hash such a token must commit to - together, the two-step workflow in [`TIMESTAMPING.md`](TIMESTAMPING.md). |
 | `node reference/src/cli.mjs keygen --out <key.json>` | A signing key, written with its derived key id, and a warning about what that file is. |
 
 ## 3. Proving the gates can fail

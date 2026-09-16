@@ -70,3 +70,8 @@ The logic that matters - the capture, the claim, the signature - is plain ESM in
 tested from the project's own suite in Node, using Node's WebCrypto
 (`reference/test/extension.test.mjs`). A browser is needed to *use* this extension, not to know that
 it works.
+
+## Security
+
+What this extension does with the signing key, what a stolen key can and cannot do, and what a compromised
+profile means: [`SECURITY.md`](SECURITY.md). It is short, and it answers the question a reviewer asked first.

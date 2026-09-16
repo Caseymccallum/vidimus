@@ -9,7 +9,7 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-164-3DA639)](#verify-the-claims-yourself)
+[![Tests](https://img.shields.io/badge/tests-165-3DA639)](#verify-the-claims-yourself)
 [![Vectors](https://img.shields.io/badge/vectors-43-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
@@ -25,6 +25,11 @@ MIT for the code · CC BY 4.0 for the specification · © 2026 Casey McCallum
 
 Vidimus makes one file for that. A **receipt** holds a copy of the page, a signed claim about that
 copy, and everything a stranger needs in order to check the claim without trusting you.
+
+**A page you cited has changed, or gone, and you would like to be able to show what it said.** Vidimus makes
+one file for that: a copy of the page, a signed claim about that copy, and everything a stranger needs in
+order to check the claim without trusting you. The file is a `.receipt`, the checker is `vidimus verify`, and
+it reports which parts held up - integrity, attribution, time, currency - and which parts it could not check.
 
 *Vidimus* is Latin for "we have seen". In the Middle Ages it was an instrument: an official certified
 that they had inspected a document and issued a certified copy, because the original would not
@@ -53,7 +58,7 @@ both facts true, both reported, neither hidden behind the other.
 > one is to misread.
 
 > **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
-> browser extension: 164 tests, 43 conformance vectors, no dependencies. The format is checkable and is
+> browser extension: 165 tests, 43 conformance vectors, no dependencies. The format is checkable and is
 > being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
 > left to be discovered.
 
@@ -197,7 +202,9 @@ under a minute and what it should say when you do.
 Three sibling projects in the same workspace, put together:
 
 - **Shelf** captures a page as it looked - the rendered DOM, the stylesheets, the images - locally
-  and searchably. That is the capture engine a receipt needs.
+  and searchably. That is the capture engine a receipt needs. It is not public yet, and **nothing here
+  depends on it**: the text rules it taught this project are written down in
+  [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md) section 4.5, so an implementer never has to read it.
 - **Sentinel** scores what a page is doing and shows what changed since your last visit, with no
   network calls and every number inspectable. That is the discipline a verification report needs,
   and its "not measured never costs points" rule became "a check that did not run is never a pass".
@@ -250,6 +257,9 @@ specification).
 ## Read next
 
 - [`docs/RECEIPT-SPEC.md`](docs/RECEIPT-SPEC.md) - the format, section by section.
+- [`docs/TIMESTAMPING.md`](docs/TIMESTAMPING.md) - getting a time from a third party, and what is checked.
+- [`extension/SECURITY.md`](extension/SECURITY.md) - the signing key: where it lives, and what a stolen one
+  can and cannot do.
 - [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) - what a receipt cannot do, and why.
 - [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) - what is unfinished and what it would take.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - the decisions, including the ones that were

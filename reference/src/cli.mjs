@@ -58,7 +58,8 @@ const USAGE = [
   '                       [--out <file.receipt>] [--force] [--timeout <seconds>] [--require-same-words]',
   '       vidimus seal    <capture.wacz> [--url <url>] [--captured-at <ts>] [--document <file>]',
   '                       [--profile <name>] [--key <key.json> | --unsigned]',
-  '                       [--chain <n> --prev <hash>] [--out <file.receipt>] [--force] [--json]',
+  '                       [--chain <n> --prev <hash>] [--timestamp <token.der>] [--digest-only]',
+  '                       [--out <file.receipt>] [--force] [--json]',
   '       vidimus keygen  [--out <key.json>] [--signer <name>] [--force]',
   '       vidimus keys    <directory.json>',
   '       vidimus cite    <file.receipt> [--json] [--title <text>] [--index <file>]',
@@ -300,7 +301,10 @@ function parseSeal(rest) {
       parsed.force = true;
     } else if (argument === '--unsigned') {
       parsed.unsigned = true;
-    } else if (['--url', '--captured-at', '--document', '--key', '--out', '--prev', '--profile'].includes(argument)) {
+    } else if (argument === '--digest-only') {
+      parsed.digestOnly = true;
+    } else if (['--url', '--captured-at', '--document', '--key', '--out', '--prev', '--profile',
+      '--timestamp'].includes(argument)) {
       const value = nextValue(rest, index, argument);
       if (value === null) return null;
       parsed[flagName(argument)] = value;
@@ -608,7 +612,7 @@ async function sealCapture(options) {
   }
 
   const out = options.out ?? `${options.capture.replace(/\.wacz$/i, '')}.receipt`;
-  if (existsSync(out) && options.force !== true) {
+  if (options.digestOnly !== true && existsSync(out) && options.force !== true) {
     console.error(`${out} already exists. Pass --force to replace it, or --out to write elsewhere.`);
     return 2;
   }
@@ -629,11 +633,31 @@ async function sealCapture(options) {
     }
   }
 
-  const anchor = options.chain === undefined
-    ? { type: 'none' }
-    : (options.chain === 1
+  let anchor = { type: 'none' };
+  if (options.timestamp !== undefined) {
+    // An RFC 3161 token, brought by the caller: this program has no timestamping authority to ask and never
+    // fetches one. The token has to commit to *this* claim's hash, which `--digest-only` prints - and which a
+    // token cannot change, because an rfc3161 anchor is outside the signed subtree (section 6.1).
+    let token;
+    try {
+      token = read(options.timestamp);
+    } catch (error) {
+      console.error(`${options.timestamp}: could not be read: ${error.message}`);
+      return 2;
+    }
+    anchor = { type: 'rfc3161', token: toBase64Url(token) };
+  } else if (options.chain !== undefined) {
+    anchor = options.chain === 1
       ? { type: 'chain', sequence: 1 }
-      : { type: 'chain', sequence: options.chain, prev_claim_hash: options.prev });
+      : { type: 'chain', sequence: options.chain, prev_claim_hash: options.prev };
+  }
+
+  if (options.digestOnly === true && options.timestamp === undefined) {
+    // The placeholder has to be an `rfc3161` anchor, and this is the subtle part: an rfc3161 anchor is *outside*
+    // the signed subtree and `{"type":"none"}` is *inside* it, so a digest printed under the wrong anchor type
+    // would describe a claim nobody is going to sign. The token's value does not matter - only its kind does.
+    anchor = { type: 'rfc3161', token: 'AA' };
+  }
 
   let sealed;
   try {
@@ -654,6 +678,18 @@ async function sealCapture(options) {
   }
 
   for (const warning of sealed.warnings) console.error(`warning: ${warning}`);
+
+  if (options.digestOnly === true) {
+    // The value a timestamping authority needs, and the reason this is two steps rather than one: the anchor
+    // is outside the signed subtree (section 6.1), so the token cannot change the hash it has to commit to.
+    // Seal once to learn the hash, get a token over it, seal again with `--timestamp` and the same arguments.
+    console.log(sealed.claimHash);
+    console.log('');
+    console.log('Give this digest to a timestamping authority, then seal again with --timestamp and the same');
+    console.log('arguments. The token cannot change this value, because an rfc3161 anchor is not signed.');
+    return 0;
+  }
+
   writeFileSync(out, sealed.bytes);
 
   console.log(`sealed ${options.capture} into ${out}`);

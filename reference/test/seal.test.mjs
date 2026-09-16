@@ -12,8 +12,9 @@ import assert from 'node:assert/strict';
 import { SealError, findCaptureWarc, sealFromCapture } from '../src/seal.mjs';
 import { verifyReceipt } from '../src/verify-node.mjs';
 import { DEFAULT_HTML, DEFAULT_URL, signer, waczBytes, waczEntries, warcRecord } from '../src/fixtures.mjs';
+import { TSA_GEN_TIME, tsaCertificate, timestampToken } from '../src/tst-fixture.mjs';
 import { canonicalise } from '../src/canonical.mjs';
-import { sha256, utf8 } from '../src/digest.mjs';
+import { sha256, toBase64Url, utf8 } from '../src/digest.mjs';
 import { decompress, isGzipped } from '../src/warc-node.mjs';
 import { storeGzip } from '../src/gzip.mjs';
 
@@ -173,6 +174,39 @@ test('a caller-supplied document is used, and the claim says less because of it'
   assert.equal(verdict.verified, false);
   assert.equal(verdict.exit_code, 1);
   assert.equal(verdict.levels.L1.status, 'pass', 'the signature is untouched by any of this');
+});
+
+test('a timestamp token cannot change the claim hash it commits to', async () => {
+  // This single property is what makes timestamping a two-step workflow a user can actually perform: seal
+  // once to learn the claim hash, ask a timestamping authority for a token over it, seal again with the token.
+  // It holds because an `rfc3161` anchor is outside the signed subtree (section 6.1) - which is also why a
+  // token does not need to exist when the claim is signed.
+  const capture = wacz();
+  const placeholder = sealFromCapture({ capture, key: key(), anchor: { type: 'rfc3161', token: 'AA' } });
+  const token = timestampToken({ claimHash: placeholder.claimHash, genTime: TSA_GEN_TIME });
+  const real = sealFromCapture({
+    capture,
+    key: key(),
+    anchor: { type: 'rfc3161', token: toBase64Url(token) },
+  });
+
+  assert.equal(real.claimHash, placeholder.claimHash);
+  assert.notEqual(
+    real.manifest.anchor.token,
+    placeholder.manifest.anchor.token,
+    'the two receipts carry different tokens, so the equality above is not a coincidence of both being empty',
+  );
+
+  // And the reason the placeholder has to be an `rfc3161` anchor rather than `{"type":"none"}`: the type is
+  // inside the signed subtree even though the token is not. Getting this wrong produces a digest nobody will
+  // ever sign - which is exactly what a first attempt at the CLI workflow did, and what this pins.
+  const wrongKind = sealFromCapture({ capture, key: key() });
+  assert.notEqual(wrongKind.claimHash, placeholder.claimHash);
+
+  // And the receipt with the real token is one a verifier can validate, against a pinned TSA.
+  const verdict = await verifyReceipt(real.bytes, { trustedTsa: [sha256(tsaCertificate())] });
+  assert.equal(verdict.levels.L2.status, 'pass');
+  assert.equal(verdict.time.attested_before, TSA_GEN_TIME);
 });
 
 test('a capture time that is not UTC to the second is refused', async () => {

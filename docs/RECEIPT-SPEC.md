@@ -701,6 +701,18 @@ Three rules make the report worth reading:
 A claim that declares no text fingerprint can only be compared byte-for-byte, and the report says so as a
 caveat rather than implying a comparison of words that never happened.
 
+Printed, the most useful case looks like this - a page that moved without changing what it said:
+
+```
+page.receipt · claim fbf9d6d7…
+claim says  https://example.org/a-page-worth-citing · 2026-01-01T00:00:00Z
+
+fetched     200 at 2026-09-15T12:00:03Z (a request made because you asked)
+  bytes     changed
+  words     unchanged
+  outcome   the bytes changed and the words did not
+```
+
 `vidimus check` performs this act: it verifies the receipt first (a claim whose bytes do not match its own
 digest is not something to compare a page with), fetches the URL, seals a second receipt for what the page
 says now, and prints the report. `--out` writes that second receipt, so a reader can see what the page said
@@ -810,6 +822,12 @@ attributes must name the `TSTInfo` content type, and must carry the digest of th
 and never as a fault in the receipt (D-021). That includes a token using a signature algorithm, a digest
 algorithm, an imprint hash or a signer identification this implementation does not implement, all of
 which are listed in `docs/CONFORMANCE.md` rather than left to be discovered.
+
+**Writing one.** A producer that has a token writes it with `--timestamp <token.der>`; one that does not have
+a token yet prints the digest a token must commit to with `--digest-only`, using the same arguments it will
+seal with. The two steps work because the anchor's **type** is inside the signed subtree and its **token** is
+not: the value cannot change the digest, which is precisely why the digest can exist first. The workflow -
+with `openssl ts` and a real authority, which this project has never talked to - is in `docs/TIMESTAMPING.md`.
 
 ### 8.4 How time is reported
 
@@ -932,6 +950,11 @@ Still open, with the reason each is deferred:
    could do with it: the vectors currently pin one implementation's answers, which is agreement rather
    than corroboration. `CONTRIBUTING.md` says so first, and `--emit` writes the fixtures so that the work
    does not start with reimplementing ours.
-3. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
+4. **A hosted verifier.** The verifier is pure and browser-safe - the extension already runs it - so a web
+   page that checks a receipt client-side, with no upload, is the same code in a different wrapper. It is
+   not built, and the reason is not doubt about the mechanics: it is that a hosted checker is a *thing
+   people would trust*, and it would need the same care about what it says as the command line has
+   (`docs/THREAT-MODEL.md` section 3).
+5. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
    on purpose rather than for want of time: the first needs a CMS `SignedData` over a byte range, and the
    second is a network fetch a verifier must never make on its own initiative (section 6.7).
