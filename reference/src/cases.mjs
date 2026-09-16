@@ -23,8 +23,9 @@
 import { canonicalJson, buildReceipt, prettyJson, signer, stranger } from './fixtures.mjs';
 import { sha256, toBase64Url, utf8 } from './digest.mjs';
 import { textDigest } from './text.mjs';
+import { buildWarcRecord } from './capture.mjs';
 import { TSA_GEN_TIME, tsaCertificate, timestampToken } from './tst-fixture.mjs';
-import { FIXTURE_DATE, waczBytes, waczEntries, DEFAULT_HTML, SPEC_VERSION } from './fixtures.mjs';
+import { FIXTURE_DATE, waczBytes, waczEntries, DEFAULT_HTML, DEFAULT_URL, SPEC_VERSION } from './fixtures.mjs';
 import { writeZip } from './zip.mjs';
 import { canonicalise } from './canonical.mjs';
 import { signMessage } from './signature.mjs';
@@ -595,6 +596,76 @@ export const CASES = [
       exit_code: 2,
       levels: { L0: 'pass', L1: 'pass', L2: 'fail', L3: 'not_applicable' },
       checks: { 'anchor.verified': 'fail' },
+    },
+  },
+  {
+    id: 'capture-advertises-no-warc',
+    description: 'a capture whose datapackage advertises no WARC record at all',
+    proves: 'the record layer refuses by name: a capture that advertises nothing to read is not_checked on the document - a gap in the reader and not a fault in the receipt - while its own resource hashes, which are the part it does describe, are still checked and still pass',
+    build: () => {
+      const payload = utf8('not a WARC record, and not advertised as one');
+      const dataPackage = canonicalise({
+        profile: 'data-package',
+        wacz_version: '1.1.1',
+        resources: [{
+          name: 'other.bin', path: 'archive/other.bin',
+          hash: `sha256:${sha256(payload)}`, bytes: payload.length,
+        }],
+      });
+      return buildReceipt({
+        wacz: waczBytes([['datapackage.json', utf8(dataPackage)], ['archive/other.bin', payload]]),
+      }).bytes;
+    },
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'not_checked' },
+    },
+  },
+  {
+    id: 'document-url-the-capture-does-not-hold',
+    description: 'a capture whose WARC holds a different page from the one the claim cites',
+    proves: 'the reader matches WARC-Target-URI exactly rather than falling back to whatever record it finds first: "no record for your page" is a fact the caller needs, and picking another page would report a document the claim never described',
+    build: () => buildReceipt({
+      wacz: waczBytes(waczEntries({ url: 'https://elsewhere.example/another-page' })),
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'not_checked' },
+    },
+  },
+  {
+    id: 'capture-disagrees-with-its-own-payload-digest',
+    description: 'a capture that states a WARC-Payload-Digest its own payload does not have',
+    proves: 'a capture that disagrees with itself about its own bytes is not one to read a document out of, so the reader refuses by name rather than hashing what it found - and the record is a plain uncompressed WARC, which is the other half of what this vector covers',
+    build: () => {
+      const record = buildWarcRecord({
+        url: DEFAULT_URL, status: 200, capturedAt: FIXTURE_DATE, body: DEFAULT_HTML,
+      });
+      const text = new TextDecoder()
+        .decode(record)
+        .replace(/WARC-Payload-Digest: sha256:(.)/, (whole, first) => whole.replace(first, first === 'A' ? 'B' : 'A'));
+      const payload = utf8(text);
+      const dataPackage = canonicalise({
+        profile: 'data-package',
+        wacz_version: '1.1.1',
+        resources: [{
+          name: 'data.warc', path: 'archive/data.warc',
+          hash: `sha256:${sha256(payload)}`, bytes: payload.length,
+        }],
+      });
+      return buildReceipt({
+        wacz: waczBytes([['datapackage.json', utf8(dataPackage)], ['archive/data.warc', payload]]),
+      }).bytes;
+    },
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'not_checked' },
     },
   },
   {

@@ -58,7 +58,7 @@ python conformance/verify_claims.py ./kit          # exit 0 when nothing disagre
 ## The result
 
 ```
-claim hashes: 45 of 52 fixtures agree
+claim hashes: 45 of 55 fixtures agree
 3 refused, and the record says the same (a corroborated refusal, not a pass by silence)
 0 disagree
 ```
@@ -72,7 +72,7 @@ words extracted from the capture's document by the seven rules of section 4.5.1 
 refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not read),
 and the record agrees that they are refused.
 
-Every status each check can produce is exercised across those 52 fixtures: all four of `anchor.verified`
+Every status each check can produce is exercised across those 55 fixtures: all four of `anchor.verified`
 (`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, the `pass` and `fail` of the
 text fingerprint and its `not_applicable` when a claim carries none, and both the refusals and the stage gaps
 of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
@@ -87,6 +87,22 @@ already did; `keyDirectory` did not, and no implementation of it could be checke
 cost a case and found a real gap here: this implementation claimed `not_checked` for a caller who supplied a
 directory, because it did not read one - which is wrong in the direction that flatters nobody, since it reports
 a key as unvouched-for when the caller vouched for it. That is now implemented, and the vector agrees.
+
+**The reader's refusals are now covered too.** `warc.py` and `reference/src/warc.mjs` both refuse by name in
+several places, and until now every fixture handed them a well-formed, single-record, correctly-gzipped WARC -
+so none of those refusals had ever run. Three vectors change that: a capture that advertises no WARC at all, a
+capture whose WARC holds a different page from the one the claim cites, and a capture that states a
+`WARC-Payload-Digest` its own payload does not have (which also covers a plain uncompressed WARC, the other
+thing nothing had exercised). All three report `subject.document: not_checked`, and this implementation agreed
+on the first run - so ten lines of refusal logic are now verified rather than merely written.
+
+**And the vector generator refused the expectations I wrote for them.** I had the three new cases expect
+`verified: true, exit_code: 0`, on the reasoning that nothing had failed. `--write` checks every case's
+written expectation against the implementation *before* it records anything, and said: *expected verified=true,
+got false*. It was right and I was wrong: section 7.5 requires L0 to be `pass` for `verified`, and an unreadable
+document leaves it `not_checked`, so these receipts are not verified and exit `1` - "nothing failed and nothing
+was proven". That gate exists so a re-record cannot launder a behaviour change, and this time it caught the
+person writing the case.
 
 ## What writing it found
 
@@ -199,7 +215,7 @@ of what it got wrong. Section 8.1 requires an anchorless claim to report `anchor
 `anchor.verified: not_checked` - an asymmetry that looks like a mistake until the reason is read ("there is
 nothing here to have a type" against "there was nothing to verify, and this receipt does not have a verified
 time"). It is stated, it is complete, and implementing it from the text alone reproduced all four statuses that
-check can produce, across 52 fixtures - including the `unsupported` an unknown type gets, which is the rule a
+check can produce, across 55 fixtures - including the `unsupported` an unknown type gets, which is the rule a
 naive implementation would get wrong by calling it a failure. Section 8 is the part of this specification a
 second implementer can follow without asking anybody anything.
 
@@ -213,7 +229,7 @@ Section 11 lists four conditions, and this implementation meets them:
    reached filled in as `not_checked` rather than omitted;
 2. **the status, level-rollup and `verified` rules of sections 7.1-7.5** - derived independently and compared,
    and agreeing;
-3. **the canonical form, byte for byte, including the refusals** - 47 of 52 fixtures agree, and the three
+3. **the canonical form, byte for byte, including the refusals** - 47 of 55 fixtures agree, and the three
    refusals are corroborated as refusals rather than passed over in silence;
 4. **the recorded verdicts** - comparing every rule-derived field, and agreeing on all nine distinct
    combinations of `attribution`, `time_bound` and `capture_profile` the fixtures contain.

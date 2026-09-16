@@ -1499,6 +1499,150 @@
       }
     },
     {
+      "id": "capture-advertises-no-warc",
+      "description": "a capture whose datapackage advertises no WARC record at all",
+      "proves": "the record layer refuses by name: a capture that advertises nothing to read is not_checked on the document - a gap in the reader and not a fault in the receipt - while its own resource hashes, which are the part it does describe, are still checked and still pass",
+      "fixture": {
+        "file": "capture-advertises-no-warc.receipt",
+        "sha256": "c35322b32d6db3dab033f7c2fb45abf62bec0d5d8eb1bbd531b9e39864dd0108",
+        "bytes": 1616
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "7e9ee09e250524c8695e44139e04ffcf4ac7f69ba3c04024fdaeb7af2ba52c8d",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "document-url-the-capture-does-not-hold",
+      "description": "a capture whose WARC holds a different page from the one the claim cites",
+      "proves": "the reader matches WARC-Target-URI exactly rather than falling back to whatever record it finds first: \"no record for your page\" is a fact the caller needs, and picking another page would report a document the claim never described",
+      "fixture": {
+        "file": "document-url-the-capture-does-not-hold.receipt",
+        "sha256": "265dca8588c6091912d8df89d43f0ff6f9d01cc4e956d08eb187147bb8c1ee7b",
+        "bytes": 2221
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "979fd2527b96bc1bdc8e7c124e31ece723ac5d65fc5fe09dfb8df43f2b1b24de",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "capture-disagrees-with-its-own-payload-digest",
+      "description": "a capture that states a WARC-Payload-Digest its own payload does not have",
+      "proves": "a capture that disagrees with itself about its own bytes is not one to read a document out of, so the reader refuses by name rather than hashing what it found - and the record is a plain uncompressed WARC, which is the other half of what this vector covers",
+      "fixture": {
+        "file": "capture-disagrees-with-its-own-payload-digest.receipt",
+        "sha256": "cceef879788b5bab3b54ead1064ae34db21f7eef3394bb708337acdcf6c9fa0d",
+        "bytes": 2122
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "abc7f50fb89fda6bb5ff63da8e56c63c7e584bbcf3412925f0d7b1cb3df1daee",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
       "id": "capture-path-is-a-stream-name",
       "description": "a claim whose capture entry name carries a colon",
       "proves": "section 12: a colon is a drive letter or an NTFS alternate data stream on Windows and has no business in a receipt, so the name is refused at the shape check even though it resolves nowhere near the filesystem on the machine checking it",
