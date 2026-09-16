@@ -218,7 +218,7 @@ here because a format that cannot say what it grew out of is a format nobody can
 
 - **A second implementation — started.** `conformance/` is a Python implementation of all 21 checks of section
   7.4, written from the specification rather than from the reference, with Ed25519 from RFC 8032, a DER/X.509
-  reader, an RFC 3161 token verifier and a `text-v1` extractor alongside it. It agrees with the record on 42
+  reader, an RFC 3161 token verifier and a `text-v1` extractor alongside it. It agrees with the record on 58
   of 61 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
   `verified`, `exit_code`, `capture_profile`, `attribution` and `time_bound`, agreeing there too. It meets
   section 11's four conditions: all 21 checks, the rollup rules, the canonical form byte for byte, and every
