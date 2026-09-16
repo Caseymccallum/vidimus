@@ -37,6 +37,14 @@ fixtures - but they corroborate *understanding of the reference's behaviour* rat
 specification's text, and calling them the same would be the kind of overstatement this project is arranged
 against.
 
+What has since happened to them is worth stating precisely, because it is easy to overclaim in either
+direction. The rules they needed are now **in the specification** (sections 8.3 and 9, D-035) - so an
+implementation started tomorrow would not have to read `reference/` at all. That does not retroactively make
+this one specification-derived: it was written with the reference in view, and if the reference is wrong about
+record separation or about the re-tagged attributes, this file is wrong in the same way. What the exercise
+produced is a specification that no longer needs that shortcut, which is a better outcome than a second
+implementation that still does.
+
 `text.py` was in the first group and stays there, but for a reason worth stating: when it was written, section
 4.5.1 was silent on three things about a digest, so this implementation had to choose - and those three choices
 were then *written into the specification* (D-035). A guess that the format adopts stops being a guess, and the
@@ -72,9 +80,9 @@ nothing.
 
 ## What writing it found
 
-Nine things that only showed up when somebody implemented the format somewhere else. Three are fixed in the
+Nine things that only showed up when somebody implemented the format somewhere else. Six are fixed in the
 specification; the rest are named as open, because a list that reads as if it were closed is worse than no
-list at all. Each of the fixed ones was fixed *after* a second implementation got it wrong, which is the only
+list at all. Each of the fixed ones was fixed *after* a second implementation got it wrong - which is the only
 argument for a rule that a reader cannot talk back to.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
@@ -103,7 +111,8 @@ argument for a rule that a reader cannot talk back to.
    `..`, no backslashes, no drive letters"*) and the enumeration — the length cap, the refusal of `//`, of a
    colon, of a trailing dot-segment — is in `reference/src/verify.mjs`. A second implementer cannot infer a
    list from a principle, and this implementation guessed at `MAX_ENTRY_NAME` rather than reading it. **The
-   specification should state the list.**
+   specification now states the list** (section 12), and the guess turned out to match it exactly - which is
+   luck, not method: the guessing is the finding, not whether it happened to be right.
 
 8. **What a timestamp token's signature covers is not stated.** Section 8.3 lists the CMS bindings a token
    must carry - the signed attributes must name the `TSTInfo`, and must carry its digest - and says nothing
@@ -112,7 +121,22 @@ argument for a rule that a reader cannot talk back to.
    element's *value*, which silently drops the length octets and produces a shorter byte string. The result
    was `anchor.verified: fail` on a perfectly good token, with everything else - the certificate, the imprint,
    the key usage, the validity window - checking out. The vectors caught it in one run, and an implementer with
-   no vectors would have concluded the TSA was lying.
+   no vectors would have concluded the TSA was lying. **Now stated** in section 8.3.
+
+Nine findings, six of them closed by changing the specification rather than the code:
+
+| Finding | Now stated in |
+| --- | --- |
+| 1. `-0` cannot be refused after parsing everywhere | Section 5.1, rule 5 - and pinned by `claim-contains-minus-zero` |
+| 2. Escaping did not say the case of its hex digits | Section 5.1, rule 4 - and pinned by `claim-contains-a-control-character` |
+| 4. The WARC-reading rules a digest depends on | Section 9: record separation, the `Content-Length` cut, the truncation refusal, the payload digest |
+| 5. The safe-entry-name enumeration | Section 12: the length, the leading slash, the backslash, the colon, `//`, and the dot segments |
+| 8. What a timestamp token's signature actually covers | Section 8.3: the attributes re-tagged as a `SET OF`, length octets and all |
+| 9. Whitespace, named references and decoding in `text-v1` | Section 4.5.1 rules 5 and 6, and section 4.5.2 (D-035) |
+
+The three that remain open are #3 (the shape of the stage structure), #6 (the stage order as a picture) and #7
+(the `signature.present` reading) - all three about *when* a check runs rather than what it means, and all
+three discoverable from the vectors, which is the mechanism working as intended.
 
 9. **`text-v1` left three things to the reader, and it now does not.** Section 4.5.1 was otherwise a model of
    how to write an extraction down - seven rules, a named element list, a stated degradation for malformed

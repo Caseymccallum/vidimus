@@ -845,6 +845,12 @@ implementation existed so that a half-implementation cannot answer "yes" too ear
 The two CMS bindings are also required, because without them a signature means nothing: the signed
 attributes must name the `TSTInfo` content type, and must carry the digest of the content they sign.
 
+**What is signed is those attributes re-tagged as a `SET OF`** - the same bytes after the tag that identifies
+them, with the length octets included. That is the one CMS detail which catches every first implementation:
+taking the attributes as they appear *inside* the `[0]` element drops those length octets, produces a shorter
+byte string, and makes the signature fail. A verifier that reports a good token as `fail` on that basis has
+told its caller the authority lied, when the fault is in the reader.
+
 **A token this verifier cannot read is reported as its own limit** - `unsupported`, with the reason -
 and never as a fault in the receipt (D-021). That includes a token using a signature algorithm, a digest
 algorithm, an imprint hash or a signer identification this implementation does not implement, all of
@@ -878,7 +884,7 @@ a limitation somebody will assume away.
 | Not done | Belongs to | Why it is not done yet |
 | --- | --- | --- |
 | Full WACZ validation | `capture.wacz.*` | The receipt layer depends on the container's own resource hashes, not on re-implementing the WACZ specification. Use `py-wacz` or the Webrecorder tooling for that. |
-| Full WARC semantics | `subject.document`, `subject.text` | The verifier reads the response record for `subject.url` and the body after its HTTP headers, and nothing else: no deduplication, no revisit records, no site reconstruction (D-016). A capture whose record this narrow reader will not open is reported `not_checked`, never as a change and never as a pass (section 4.2). |
+| Full WARC semantics | `subject.document`, `subject.text` | The verifier reads the response record for `subject.url` and the body after its HTTP headers, and nothing else: no deduplication, no revisit records, no site reconstruction (D-016). What that reader *does* is stated here rather than left to ISO 28500, because two implementations have to do the same thing before a digest can agree: records are separated by the magic `WARC/1.0` searched for anywhere in the inflated stream, and **not** by the record's own `Content-Length`, which is optional in practice and which writers disagree about; the body is cut to the HTTP `Content-Length` when the response states one, and a stated length longer than the record holds is a **truncated capture**, refused rather than hashed in part; and a record's own `WARC-Payload-Digest`, when it states one in an algorithm the reader implements, is checked against its payload. A capture whose record this narrow reader will not open is reported `not_checked`, never as a change and never as a pass (section 4.2). |
 | Whether a capture holds the wire bytes or the rendered document | `capture.profile` (section 4.4) | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. A claim now says which kind of capture it holds, and a verifier reports what it declared without judging it: what a capture holds cannot be worked out from its bytes, which is why the field exists. |
 | RFC 3161 token validation | `anchor.verified` | **Done**, against a TSA the caller pins (section 8.3). What is still not done is named there and in `docs/CONFORMANCE.md`: no chain building to a root, no revocation checking, and a stated list of algorithms. |
 | Level 3 (currency) | `subject.text`, and the report in section 7.7 | The verifier checks the claim's own fingerprint (section 4.5) and never fetches anything. Whether the page still says the same words is a comparison with its own report, performed by a caller that asks for it - `vidimus check` - and it **MUST NOT** be folded into `verified`. |
@@ -939,9 +945,13 @@ still disagree about everything a user cares about.
 
 ## 12. Security considerations
 
-- **A receipt is untrusted input.** Entry names are confined to the archive by `manifest.shape` -
-  no absolute paths, no `..`, no backslashes, no drive letters - because that name reaches a
-  filesystem call in every consumer. Sizes are capped: what a verifier will inflate is decided before it
+- **A receipt is untrusted input.** Entry names are confined to the archive by `manifest.shape`, because that
+  name reaches a filesystem call in every consumer, and the rule is **enumerated rather than implied** - a
+  second implementation has to enforce the same one, and "no absolute paths" is a principle rather than a
+  list. A name is admitted when it is 1 to 255 characters, does not begin with `/`, and contains no backslash,
+  no colon, no `//`, and no empty, `.` or `..` segment. A colon is a drive letter or an NTFS alternate data
+  stream on Windows; a backslash separates on some systems and not others - which is exactly where two
+  implementations come to disagree about the same name. Sizes are capped: what a verifier will inflate is decided before it
   inflates anything, and declared sizes are treated as claims rather than as facts (section 7.8).
 - **A receipt proves the existence of bytes, never their meaning.** `capture.digest` says you hold
   the capture the claim names. What the capture says is a question for a human being.
