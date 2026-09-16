@@ -410,6 +410,50 @@
       }
     },
     {
+      "id": "text-extraction-rules",
+      "description": "a document that exercises every rule of section 4.5.1 at once",
+      "proves": "the extraction is complete enough to reproduce a fingerprint from the rules alone: block and inline, the elements that are not read, the attributes that ask not to be read, named and numeric references, an unknown named one, an out-of-range numeric one, and the malformed markup a crawler fetched rather than a browser serialised",
+      "fixture": {
+        "file": "text-extraction-rules.receipt",
+        "sha256": "5ea41cabfbfa6c2c3257dd1bbba3662c35d37cc9598af957ce918b34a9de409c",
+        "bytes": 2838
+      },
+      "options": {},
+      "expect": {
+        "verified": true,
+        "exit_code": 0,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "pass"
+        },
+        "checks": {}
+      },
+      "verdict": {
+        "verified": true,
+        "exit_code": 0,
+        "claim_hash": "2efd89f49b5cb35ecc198e18612dd90c1e0188dfba53398750104ba4dfd1ce8f",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "pass"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked"
+        }
+      }
+    },
+    {
       "id": "text-fingerprint-wrong",
       "description": "a receipt whose text fingerprint is not the words in its own capture",
       "proves": "the fingerprint is checked against the capture, so a claim that says the page said something it did not is a failure - this is the shape of the bug this project's own fixture had, found by the check the fixture made necessary",
@@ -1329,6 +1373,106 @@
         "verified": false,
         "exit_code": 2,
         "claim_hash": "dc4e4ad89e68a10bd501859a584515b44cfe019496817f5631717ce392e6a9e2",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "anchor.verified": "fail",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-rfc3161-not-a-timestamping-certificate",
+      "description": "a token signed by a pinned certificate that is not a timestamping one",
+      "proves": "section 8.3 step 1, second half: a pin is not a licence to skip the protocol - RFC 3161 requires the timeStamping extended key usage, so a pinned certificate without it is a failure rather than an untested pass",
+      "fixture": {
+        "file": "anchor-rfc3161-not-a-timestamping-certificate.receipt",
+        "sha256": "dc27d820b8a2b51cb811ce32fe96dc88b2f3caf0bccbfcf8e34e6131e342b672",
+        "bytes": 4043
+      },
+      "options": {
+        "trustedTsa": [
+          "a62b6f2d7d49b750bbe5083ff555558e818c26c201e4f947e820e323eb69e1ac"
+        ]
+      },
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 0,
+        "checks": {
+          "anchor.verified": "fail",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "anchor-rfc3161-stamped-outside-validity",
+      "description": "a token whose genTime falls outside the signing certificate&#39;s validity window",
+      "proves": "section 8.3 step 3: a timestamp is only as good as the certificate that made it, so a stamp from outside that window is a failure - and because this format consults no revocation list, a certificate valid at the time may still have been revoked, which the verdict does not pretend otherwise about",
+      "fixture": {
+        "file": "anchor-rfc3161-stamped-outside-validity.receipt",
+        "sha256": "8abf0e3034bc7f3ba3f0dae49e55b8a6ba77109e0495371b9b3c53a4fb0f5fde",
+        "bytes": 4075
+      },
+      "options": {
+        "trustedTsa": [
+          "37257e15fb4d91b24ef13b71a416936a37674f636a1b4aaf73e66d62044d3bf3"
+        ]
+      },
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "fail",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "anchor.verified": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "5667cfbeb287bbb9366630e95c3b65d90a4fea188fe4659583ba81392b7f4760",
         "capture_profile": null,
         "levels": {
           "L0": "pass",

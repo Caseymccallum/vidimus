@@ -161,6 +161,42 @@ export const CASES = [
     },
   },
   {
+    id: 'text-extraction-rules',
+    description: 'a document that exercises every rule of section 4.5.1 at once',
+    proves: 'the extraction is complete enough to reproduce a fingerprint from the rules alone: block and inline, the elements that are not read, the attributes that ask not to be read, named and numeric references, an unknown named one, an out-of-range numeric one, and the malformed markup a crawler fetched rather than a browser serialised',
+    build: () => {
+      const html = [
+        '<!doctype html><html><head><title>Not read</title>',
+        '<style>.a{content:"<b>still not read</b>"}</style>',
+        '<meta charset="utf-8"></head><body>',
+        '<h1>A &amp; B</h1>',
+        '<p>One   line, &#65; and &#x42;, a&nbsp;gap, &unknown; and &#1114112;.</p>',
+        '<div hidden>hidden text</div>',
+        '<div aria-hidden="true">aria hidden</div>',
+        '<span style="display:none">display none</span>',
+        '<span style="visibility: hidden">invisible</span>',
+        '<script>if (a < b) { document.write("<p>script text</p>"); }</script>',
+        '<p>five &gt; three, and 3 < 5</p>',
+        '</div><p>an unmatched end tag is ignored</p>',
+        '<table><tr><td>cell one</td><td>cell two</td></tr></table>',
+        'inline <b>bold</b> joins its neighbours',
+        '</body></html>',
+      ].join('');
+      return buildReceipt({
+        html,
+        manifestPatch: (manifest) => {
+          manifest.subject.text = { normalization: 'text-v1', sha256: textDigest(html) };
+        },
+      }).bytes;
+    },
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'pass' },
+      checks: {},
+    },
+  },
+  {
     id: 'text-fingerprint-wrong',
     description: 'a receipt whose text fingerprint is not the words in its own capture',
     proves: 'the fingerprint is checked against the capture, so a claim that says the page said something it did not is a failure - this is the shape of the bug this project\'s own fixture had, found by the check the fixture made necessary',
@@ -496,6 +532,43 @@ export const CASES = [
     build: () => buildReceipt({
       anchor: { type: 'chain', sequence: 1, prev_claim_hash: EARLIER_CLAIM },
     }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'pass', L1: 'pass', L2: 'fail', L3: 'not_applicable' },
+      checks: { 'anchor.verified': 'fail' },
+    },
+  },
+  {
+    id: 'anchor-rfc3161-not-a-timestamping-certificate',
+    description: 'a token signed by a pinned certificate that is not a timestamping one',
+    proves: 'section 8.3 step 1, second half: a pin is not a licence to skip the protocol - RFC 3161 requires the timeStamping extended key usage, so a pinned certificate without it is a failure rather than an untested pass',
+    build: () => {
+      const certificate = tsaCertificate({ withTimeStampingEku: false });
+      const provisional = buildReceipt({ anchor: { type: 'rfc3161', token: 'AA' } });
+      const token = timestampToken({ claimHash: provisional.claimHash, genTime: TSA_GEN_TIME, certificate });
+      return buildReceipt({ anchor: { type: 'rfc3161', token: toBase64Url(token) } }).bytes;
+    },
+    options: { trustedTsa: [sha256(tsaCertificate({ withTimeStampingEku: false }))] },
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'pass', L1: 'pass', L2: 'fail', L3: 'not_applicable' },
+      checks: { 'anchor.verified': 'fail' },
+    },
+  },
+  {
+    id: 'anchor-rfc3161-stamped-outside-validity',
+    description: 'a token whose genTime falls outside the signing certificate&#39;s validity window',
+    proves: 'section 8.3 step 3: a timestamp is only as good as the certificate that made it, so a stamp from outside that window is a failure - and because this format consults no revocation list, a certificate valid at the time may still have been revoked, which the verdict does not pretend otherwise about',
+    build: () => {
+      const validity = { notBefore: '2030-01-01T00:00:00Z', notAfter: '2031-01-01T00:00:00Z' };
+      const certificate = tsaCertificate(validity);
+      const provisional = buildReceipt({ anchor: { type: 'rfc3161', token: 'AA' } });
+      const token = timestampToken({ claimHash: provisional.claimHash, genTime: TSA_GEN_TIME, certificate });
+      return buildReceipt({ anchor: { type: 'rfc3161', token: toBase64Url(token) } }).bytes;
+    },
+    options: { trustedTsa: [sha256(tsaCertificate({ notBefore: '2030-01-01T00:00:00Z', notAfter: '2031-01-01T00:00:00Z' }))] },
     expect: {
       verified: false,
       exit_code: 2,

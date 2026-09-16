@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 45 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 48 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -779,6 +779,29 @@ delegates WARC semantics to ISO 28500, and says nothing about where a record end
 `Content-Length` means, or whether a record's own `WARC-Payload-Digest` is checked. It was written with the
 reference in view, so it corroborates the reference's *behaviour* rather than the specification's *text* - a
 weaker claim, and `conformance/README.md` says so where the result is stated rather than in a footnote.
+
+### D-035 - What a fingerprint cannot leave to the reader
+
+Section 4.5.1 defines `text-v1` as seven rules over bytes, and three things it did not state were found by
+writing those rules into a second implementation. All three change the digest, and a digest two implementations
+spell differently is the failure the section exists to prevent. They are now stated:
+
+- **whitespace** (rule 5) is written out as a set of code points rather than left to a language's own `\s`,
+  because Unicode and JavaScript disagree at the edges: U+0085 is whitespace to Unicode and not here, U+FEFF is
+  whitespace here and not to Unicode;
+- **named character references** (rule 6) are exactly six - `amp`, `lt`, `gt`, `quot`, `apos`, `nbsp` - which is
+  what "no full HTML5 entity table" was always doing, and never said;
+- **decoding** (section 4.5.2) is UTF-8 with U+FFFD for a byte that is not valid UTF-8, and no `Content-Type`
+  or `<meta charset>` sniffing, because a fingerprint that depends on which of two declarations a parser
+  believed is not reproducible.
+
+Each was found by giving the vector set a fixture that exercised it. `text-extraction-rules` covers all seven
+rules at once, and found two bugs in that implementation on its first run: `&nbsp;` was missing from the named
+set, so `a&nbsp;b` did not fingerprint the way `a b` does; and a `<` that does not begin a tag - which rule 7
+says is text - was appended *undecoded*, so `five &gt; three, and 3 < 5` came out as a line with a literal
+`&gt;` in it. Neither was visible to the two text fixtures that existed, because both used the same document:
+an `h1` and a `p`. That is the general case for a rule nobody has had to follow - it reads as complete until
+somebody tries to reproduce it, and then the silence is in the one place the rules meet.
 
 ## 3. What this implementation deliberately does not have
 

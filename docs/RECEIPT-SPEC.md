@@ -285,11 +285,17 @@ nothing at all for a detached document.
 4. **Neither is anything inside an element that asks not to be read:** one with a `hidden` attribute, one
    with `aria-hidden="true"`, or one whose `style` attribute contains `display:none` or
    `visibility:hidden`. Only the element's own attributes count (see 4.5.4).
-5. **A line is collapsed and trimmed.** Interior runs of whitespace become one space; a line that is
-   empty is not emitted. Lines are joined with `\n`.
-6. **Character references** - named, decimal and hexadecimal - become their characters. A reference that
-   cannot be a character is left exactly as written, because a substitution a second implementation
-   cannot reproduce is not a fingerprint.
+5. **A line is collapsed and trimmed.** Interior runs of whitespace become one space, where whitespace is
+   exactly this set: U+0009, U+000A, U+000B, U+000C, U+000D, U+0020, U+00A0, U+1680, U+2000 through U+200A,
+   U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF. It is written out rather than left to a language's
+   own `\s`, because the definitions disagree at the edges - U+0085 is whitespace to Unicode and not here,
+   U+FEFF is whitespace here and not to Unicode - and a fingerprint cannot afford a disagreement at an edge.
+   A line that is empty is not emitted. Lines are joined with `\n`.
+6. **Character references** become their characters: decimal, hexadecimal, and exactly six named ones -
+   `amp`, `lt`, `gt`, `quot`, `apos`, and `nbsp`, which is U+00A0 and so collapses to a space under rule 5.
+   A reference that cannot be a character is left exactly as written: an unknown name, a numeric reference
+   above U+10FFFF, a surrogate, or U+0000. Nothing is substituted for it, because a substitution a second
+   implementation cannot reproduce is not a fingerprint.
 7. **Malformed markup degrades in defined ways.** A `<` that does not begin a tag is text. A tag inside
    `script`, `style`, `title` or `textarea` is content, not markup. An end tag with no matching start is
    ignored. An unterminated tag ends the document.
@@ -306,6 +312,12 @@ and no DOM. That has two consequences, and both are the point.
 - **A fingerprint is reproducible from this document.** An implementation that follows these rules and no
   others gets the same digest, including for the malformed markup a crawler fetched rather than a browser
   serialised.
+
+The document's bytes are decoded as **UTF-8**, and a byte that is not valid UTF-8 becomes U+FFFD. The
+declaration in a `Content-Type` or a `<meta charset>` is not consulted, and no encoding is guessed: a
+fingerprint that depends on which of two disagreeing declarations a parser chose to believe is not
+reproducible, and a page whose bytes are not UTF-8 can still be *cited* - it simply has no `text-v1`
+fingerprint until somebody writes down what was done with it.
 
 ### 4.5.3 What this check proves, and what it does not
 

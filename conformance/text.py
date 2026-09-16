@@ -50,7 +50,19 @@ VOID_ELEMENTS = frozenset({
 })
 
 # Rule 6: the named references this implementation knows, and no more (section 4.5.4: no full HTML5 table).
-NAMED_REFERENCES = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
+# `nbsp` is the one that matters beyond the five XML shares: it decodes to U+00A0, which rule 5 then collapses
+# to a space - so a page that writes `a&nbsp;b` and a page that writes `a b` fingerprint the same way.
+NAMED_REFERENCES = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'", "nbsp": "\u00a0"}
+
+# Rule 5: the whitespace a line collapses. Spelled out rather than left to Python's `str.split()`, because
+# the two sets differ at their edges - Python counts U+0085 and the C0 separators as whitespace and not
+# U+FEFF, and the other side counts U+FEFF and not U+0085 - and a fingerprint cannot afford a disagreement at
+# an edge. This is the set the specification's own implementation collapses with, written down.
+WHITESPACE = (
+    "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000\ufeff"
+)
+WHITESPACE_RUN = re.compile("[" + re.escape(WHITESPACE) + "]+")
 
 TAG_NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9:-]*")
 REFERENCE = re.compile(r"&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);")
@@ -74,7 +86,7 @@ def _lines(text: str) -> list[str]:
     position = 0
 
     def end_line() -> None:
-        collapsed = " ".join("".join(current).split())
+        collapsed = WHITESPACE_RUN.sub(" ", "".join(current)).strip(WHITESPACE)
         if collapsed:
             lines.append(collapsed)
         current.clear()
@@ -88,7 +100,10 @@ def _lines(text: str) -> list[str]:
         # Rule 7: a `<` that does not begin a tag is text.
         following = text[marker + 1:marker + 2]
         if following == "" or (not following.isalpha() and following not in ("/", "!", "?")):
-            current.append(text[position:marker + 1])
+            # Decoded like any other text: rule 1 says a text node contributes its characters with
+            # references decoded, and rule 7 says this is text. Missing that turns `&gt; three, and 3 < 5`
+            # into a line with a literal `&gt;` in it, which is how this was found.
+            current.append(_decode(text[position:marker + 1]))
             position = marker + 1
             continue
 

@@ -37,6 +37,11 @@ fixtures - but they corroborate *understanding of the reference's behaviour* rat
 specification's text, and calling them the same would be the kind of overstatement this project is arranged
 against.
 
+`text.py` was in the first group and stays there, but for a reason worth stating: when it was written, section
+4.5.1 was silent on three things about a digest, so this implementation had to choose - and those three choices
+were then *written into the specification* (D-035). A guess that the format adopts stops being a guess, and the
+line between the two groups is exactly where that has and has not happened.
+
 ```bash
 node reference/src/vectors.mjs --emit ./kit        # the fixtures and the answers
 python conformance/verify_claims.py ./kit          # exit 0 when nothing disagrees
@@ -45,7 +50,7 @@ python conformance/verify_claims.py ./kit          # exit 0 when nothing disagre
 ## The result
 
 ```
-claim hashes: 42 of 45 fixtures agree
+claim hashes: 42 of 48 fixtures agree
 3 refused, and the record says the same (a corroborated refusal, not a pass by silence)
 0 disagree
 ```
@@ -59,7 +64,7 @@ words extracted from the capture's document by the seven rules of section 4.5.1 
 refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not read),
 and the record agrees that they are refused.
 
-Every status each check can produce is exercised across those 45 fixtures: all four of `anchor.verified`
+Every status each check can produce is exercised across those 48 fixtures: all four of `anchor.verified`
 (`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, the `pass` and `fail` of the
 text fingerprint and its `not_applicable` when a claim carries none, and both the refusals and the stage gaps
 of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
@@ -67,9 +72,10 @@ nothing.
 
 ## What writing it found
 
-Nine things that only showed up when somebody implemented the format somewhere else. Two are fixed in the
+Nine things that only showed up when somebody implemented the format somewhere else. Three are fixed in the
 specification; the rest are named as open, because a list that reads as if it were closed is worse than no
-list at all.
+list at all. Each of the fixed ones was fixed *after* a second implementation got it wrong, which is the only
+argument for a rule that a reader cannot talk back to.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
    through `JSON.parse`, so the reference rejects it there; Python's `json` returns `0`, and the sign is gone
@@ -108,14 +114,22 @@ list at all.
    the key usage, the validity window - checking out. The vectors caught it in one run, and an implementer with
    no vectors would have concluded the TSA was lying.
 
-9. **`text-v1` leaves three things to the reader, and a fingerprint cannot afford that.** Section 4.5.1 is
-   otherwise a model of how to write an extraction down - seven rules, a named element list, a stated
-   degradation for malformed markup - and it does not say **which characters count as whitespace** for rule 5,
-   **which named character references are known** ("no full HTML5 entity table" rules some out, and names
-   none), or **how a document that is not UTF-8 becomes characters** at all. Each is a difference that changes
-   the digest, and a digest that differs between two implementations is the failure this section exists to
-   prevent. This implementation's three answers are stated in `text.py` rather than buried, but they are
-   answers it had to invent.
+9. **`text-v1` left three things to the reader, and it now does not.** Section 4.5.1 was otherwise a model of
+   how to write an extraction down - seven rules, a named element list, a stated degradation for malformed
+   markup - and it did not say **which characters count as whitespace** for rule 5, **which named character
+   references are known** ("no full HTML5 entity table" ruled some out and named none), or **how a document
+   that is not UTF-8 becomes characters** at all. Each is a difference that changes the digest, and a digest
+   that differs between two implementations is the failure this section exists to prevent.
+
+   **All three are now stated**, and the way they were found is the argument for writing them down. The
+   vector set had two text fixtures and both used the same trivial document - an `h1` and a `p` - so no
+   fixture had ever exercised a character reference, a hidden element, or a `<` that was not a tag.
+   `text-extraction-rules` does all three at once, and it found **two bugs in this implementation on its first
+   run**: `&nbsp;` was not in the named set, so `a&nbsp;b` did not collapse the way `a b` does; and a `<` that
+   did not begin a tag made the walk append its text chunk *undecoded*, so `five &gt; three, and 3 < 5`
+   fingerprinted differently from the same line without the malformed `<`. Neither bug was visible to any
+   existing fixture, and neither would have been visible to a reader of the rules - rule 1 says references are
+   decoded and rule 7 says this is text, and the two rules meet in a place the section did not describe.
 
 And two about *when* checks run, which the specification states as a principle and an implementer needs as a
 picture. Both were reported by the kit as disagreements, and both were this implementation's fault:
@@ -134,7 +148,7 @@ of what it got wrong. Section 8.1 requires an anchorless claim to report `anchor
 `anchor.verified: not_checked` - an asymmetry that looks like a mistake until the reason is read ("there is
 nothing here to have a type" against "there was nothing to verify, and this receipt does not have a verified
 time"). It is stated, it is complete, and implementing it from the text alone reproduced all four statuses that
-check can produce, across 45 fixtures - including the `unsupported` an unknown type gets, which is the rule a
+check can produce, across 48 fixtures - including the `unsupported` an unknown type gets, which is the rule a
 naive implementation would get wrong by calling it a failure. Section 8 is the part of this specification a
 second implementer can follow without asking anybody anything.
 

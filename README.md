@@ -10,7 +10,7 @@
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
 [![Tests](https://img.shields.io/badge/tests-165-3DA639)](#verify-the-claims-yourself)
-[![Vectors](https://img.shields.io/badge/vectors-45-3DA639)](spec/vectors/receipt-vectors.json)
+[![Vectors](https://img.shields.io/badge/vectors-48-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
 </div>
@@ -58,7 +58,7 @@ both facts true, both reported, neither hidden behind the other.
 > one is to misread.
 
 > **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
-> browser extension: 165 tests, 45 conformance vectors, no dependencies. The format is checkable and is
+> browser extension: 165 tests, 48 conformance vectors, no dependencies. The format is checkable and is
 > being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
 > left to be discovered.
 
@@ -145,7 +145,7 @@ exists today:
   success;
 - a capture core that turns what a browser knows into a WACZ - browser-safe, and the module the
   extension imports rather than reimplements (`capture.mjs`);
-- 45 conformance vectors, rebuilt and re-hashed on every run;
+- 48 conformance vectors, rebuilt and re-hashed on every run;
 - five gates, run by `npm run verify` and by CI on Linux and Windows.
 
 The browser shell exists now too, in `extension/`: one button that seals the page you are reading,
@@ -219,11 +219,11 @@ here because a format that cannot say what it grew out of is a format nobody can
 - **A second implementation — started.** `conformance/` is a Python implementation of all 21 checks of section
   7.4, written from the specification rather than from the reference, with Ed25519 from RFC 8032, a DER/X.509
   reader, an RFC 3161 token verifier and a `text-v1` extractor alongside it. It agrees with the record on 42
-  of 45 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
+  of 48 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
   `verified` and `exit_code`, agreeing there too. It is not offered as a conforming implementation because it
   compares five of the verdict's nine fields: the capture profile, attribution, the time bound and a caveat
   count are not produced (D-034, `conformance/README.md`). The fixtures ship for anyone extending it:
-  `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each one must produce, and a
+  `node reference/src/vectors.mjs --emit ./kit` writes 48 receipts, the verdict each one must produce, and a
   README with the three steps (D-031).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
