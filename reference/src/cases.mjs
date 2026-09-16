@@ -225,6 +225,36 @@ export const CASES = [
     },
   },
   {
+    id: 'text-extraction-edges',
+    description: 'a document built to exercise the corners of section 4.5.1 that the other text fixture cannot reach',
+    proves: 'the rules survive the shapes a real page arrives in: a hidden element with hidden children (so a skip has to count depth), a > inside a quoted attribute, a comment full of markup, an ampersand with no reference after it, an unknown name, a textarea whose content is text rather than markup, and an unterminated tag - which rule 7 says ends the document',
+    build: () => {
+      const html = [
+        '<!doctype html><html><body>',
+        '<div hidden><p>a hidden paragraph</p><div>nested, and also hidden</div></div>',
+        '<p title="a > b">an attribute with a comparison in it</p>',
+        '<!-- a comment with <b>markup</b> and an &entity; inside it -->',
+        '<p>bare & ampersands, and &copy; stays as written</p>',
+        '<textarea>a <b> that is text, not a tag</textarea>',
+        '<p>an unterminated tag ends the document <b class="unclosed"',
+        '<p>this line is after the unterminated tag, so nothing reads it</p>',
+        '</body></html>',
+      ].join('');
+      return buildReceipt({
+        html,
+        manifestPatch: (manifest) => {
+          manifest.subject.text = { normalization: 'text-v1', sha256: textDigest(html) };
+        },
+      }).bytes;
+    },
+    expect: {
+      verified: true,
+      exit_code: 0,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'pass' },
+      checks: {},
+    },
+  },
+  {
     id: 'text-fingerprint-wrong',
     description: 'a receipt whose text fingerprint is not the words in its own capture',
     proves: 'the fingerprint is checked against the capture, so a claim that says the page said something it did not is a failure - this is the shape of the bug this project\'s own fixture had, found by the check the fixture made necessary',

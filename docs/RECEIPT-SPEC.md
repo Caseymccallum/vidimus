@@ -281,7 +281,9 @@ nothing at all for a detached document.
    `th`, `thead`, `tr`, `ul`. Everything else is inline and joins its neighbours.
 3. **These elements are not read, nor is anything inside them:** `script`, `style`, `noscript`,
    `template`, `head`, `title`, `meta`, `link`, `svg`, `canvas`, `iframe`, `object`, `embed`, `audio`,
-   `video`.
+   `video`, and `textarea`. The last is here because its content is a form's default value rather than the
+   page's text, and because it is consumed as raw text - which is the next rule's business - a `<` inside it
+   cannot be mistaken for a tag.
 4. **Neither is anything inside an element that asks not to be read:** one with a `hidden` attribute, one
    with `aria-hidden="true"`, or one whose `style` attribute contains `display:none` or
    `visibility:hidden`. Only the element's own attributes count (see 4.5.4).
@@ -291,11 +293,16 @@ nothing at all for a detached document.
    own `\s`, because the definitions disagree at the edges - U+0085 is whitespace to Unicode and not here,
    U+FEFF is whitespace here and not to Unicode - and a fingerprint cannot afford a disagreement at an edge.
    A line that is empty is not emitted. Lines are joined with `\n`.
-6. **Character references** become their characters: decimal, hexadecimal, and exactly six named ones -
-   `amp`, `lt`, `gt`, `quot`, `apos`, and `nbsp`, which is U+00A0 and so collapses to a space under rule 5.
-   A reference that cannot be a character is left exactly as written: an unknown name, a numeric reference
-   above U+10FFFF, a surrogate, or U+0000. Nothing is substituted for it, because a substitution a second
-   implementation cannot reproduce is not a fingerprint.
+6. **Character references** become their characters: decimal, hexadecimal, and 38 named ones - the five XML
+   shares (`amp`, `lt`, `gt`, `quot`, `apos`), the spacing and punctuation a page in the wild actually uses
+   (`nbsp`, `copy`, `reg`, `trade`, `deg`, `hellip`, `mdash`, `ndash`, `minus`, `lsquo`, `rsquo`, `ldquo`,
+   `rdquo`, `laquo`, `raquo`, `bull`, `middot`, `sect`, `para`, `dagger`, `Dagger`, `times`, `plusmn`,
+   `frac12`, `frac14`, `euro`, `pound`, `yen`, `cent`), and the four accented letters a name is likely to
+   carry (`eacute`, `egrave`, `uuml`, `ouml`, `auml`). `nbsp` decodes to U+00A0 and so collapses to a space
+   under rule 5, which is why `a&nbsp;b` and `a b` fingerprint the same way. A reference that cannot be a
+   character is left exactly as written: an unknown name, a numeric reference above U+10FFFF, a surrogate, or
+   U+0000. Nothing is substituted for it, because a substitution a second implementation cannot reproduce is
+   not a fingerprint.
 7. **Malformed markup degrades in defined ways.** A `<` that does not begin a tag is text. A tag inside
    `script`, `style`, `title` or `textarea` is content, not markup. An end tag with no matching start is
    ignored. An unterminated tag ends the document.

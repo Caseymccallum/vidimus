@@ -49,10 +49,23 @@ VOID_ELEMENTS = frozenset({
     "wbr",
 })
 
-# Rule 6: the named references this implementation knows, and no more (section 4.5.4: no full HTML5 table).
-# `nbsp` is the one that matters beyond the five XML shares: it decodes to U+00A0, which rule 5 then collapses
-# to a space - so a page that writes `a&nbsp;b` and a page that writes `a b` fingerprint the same way.
-NAMED_REFERENCES = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'", "nbsp": "\u00a0"}
+# Rule 6: the named references this implementation knows. Not the HTML5 table - that is two thousand entries,
+# most of them mathematical, and a receipt does not need them - but the punctuation and spacing a page in the
+# wild actually uses. Anything else stays as written rather than being guessed at.
+#
+# `nbsp` is the one that matters beyond the obvious: it decodes to U+00A0, which rule 5 then collapses to a
+# space, so a page that writes `a&nbsp;b` and a page that writes `a b` fingerprint the same way.
+NAMED_REFERENCES = {
+    "amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'", "nbsp": "\u00a0",
+    "copy": "\u00a9", "reg": "\u00ae", "trade": "\u2122", "deg": "\u00b0",
+    "hellip": "\u2026", "mdash": "\u2014", "ndash": "\u2013", "minus": "\u2212",
+    "lsquo": "\u2018", "rsquo": "\u2019", "ldquo": "\u201c", "rdquo": "\u201d",
+    "laquo": "\u00ab", "raquo": "\u00bb", "bull": "\u2022", "middot": "\u00b7",
+    "sect": "\u00a7", "para": "\u00b6", "dagger": "\u2020", "Dagger": "\u2021",
+    "times": "\u00d7", "plusmn": "\u00b1", "frac12": "\u00bd", "frac14": "\u00bc",
+    "euro": "\u20ac", "pound": "\u00a3", "yen": "\u00a5", "cent": "\u00a2",
+    "eacute": "\u00e9", "egrave": "\u00e8", "uuml": "\u00fc", "ouml": "\u00f6", "auml": "\u00e4",
+}
 
 # Rule 5: the whitespace a line collapses. Spelled out rather than left to Python's `str.split()`, because
 # the two sets differ at their edges - Python counts U+0085 and the C0 separators as whitespace and not
@@ -140,9 +153,11 @@ def _lines(text: str) -> list[str]:
         if name is None:
             break  # an unterminated tag ends the document
 
-        if name in UNREAD_ELEMENTS or _asks_not_to_be_read(attributes):
+        if name in UNREAD_ELEMENTS or name in RAW_TEXT_ELEMENTS or _asks_not_to_be_read(attributes):
             # Skip everything inside it: for a raw-text element by looking for its own end tag, and for the
-            # others by walking their nested tags until the matching end tag.
+            # others by walking their nested tags until the matching end tag. A `textarea` is in this set and
+            # not in rule 3's list, because its content is a form's default value rather than the page's text -
+            # and because it is consumed as raw text, a `<` inside it cannot be mistaken for a tag.
             position = _skip_element(text, position, name)
             continue
 

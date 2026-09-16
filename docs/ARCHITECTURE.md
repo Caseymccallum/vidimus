@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 49 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 50 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -750,7 +750,7 @@ Three decisions about how it was done, which matter more than what it covered:
 3. **It reports what it did not reach, by name.** Three vectors are refused outright (a float, a `-0`, a
    version this implementation does not read), and the checks a stopped stage never reached are filled in as
    `not_checked` rather than omitted - so every fixture has a status for every check, and the refusals are
-   counted and listed separately from the 46 that agree, because a conformance report that says "no
+   counted and listed separately from the 47 that agree, because a conformance report that says "no
    disagreement" without saying what it never looked at is the exact failure mode this project is arranged
    against.
 
@@ -813,8 +813,10 @@ spell differently is the failure the section exists to prevent. They are now sta
 - **whitespace** (rule 5) is written out as a set of code points rather than left to a language's own `\s`,
   because Unicode and JavaScript disagree at the edges: U+0085 is whitespace to Unicode and not here, U+FEFF is
   whitespace here and not to Unicode;
-- **named character references** (rule 6) are exactly six - `amp`, `lt`, `gt`, `quot`, `apos`, `nbsp` - which is
-  what "no full HTML5 entity table" was always doing, and never said;
+- **named character references** (rule 6) are 38, listed in full in the specification. "No full HTML5 entity
+  table" said how many the set is *not* and never how many it is - and the first version of this bullet said
+  six, which is what a truncated grep of the implementation looked like rather than what the implementation
+  does. See below;
 - **decoding** (section 4.5.2) is UTF-8 with U+FFFD for a byte that is not valid UTF-8, and no `Content-Type`
   or `<meta charset>` sniffing, because a fingerprint that depends on which of two declarations a parser
   believed is not reproducible.
@@ -826,6 +828,17 @@ says is text - was appended *undecoded*, so `five &gt; three, and 3 < 5` came ou
 `&gt;` in it. Neither was visible to the two text fixtures that existed, because both used the same document:
 an `h1` and a `p`. That is the general case for a rule nobody has had to follow - it reads as complete until
 somebody tries to reproduce it, and then the silence is in the one place the rules meet.
+
+**One of those three corrections was itself wrong, and a fixture found that too.** The first version of the
+rule-6 sentence named six entities, because that is what one line of the implementation looked like after being
+truncated for display: `amp, lt, gt, quot, apos, nbsp,` and then an ellipsis the tool had added rather than the
+code. The set has 38. `text-extraction-edges` - written afterwards to cover the corners the first text fixture
+could not reach - disagreed on `&copy;` on its first run.
+
+That is worth recording rather than quietly fixing, because it is the same failure the section is about, one
+level up. A rule read off an implementation is a rule nobody checked; a rule read off a *truncated view* of an
+implementation is worse, because it looks like evidence. The fixture is what made it visible, and the reason
+there is now one for the edges as well as for the rules.
 
 ## 3. What this implementation deliberately does not have
 
