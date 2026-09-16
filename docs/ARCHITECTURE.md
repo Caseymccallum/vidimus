@@ -738,7 +738,7 @@ Three decisions about how it was done, which matter more than what it covered:
 1. **Written from the specification, not from the reference.** The rules came from sections 5, 5.1, 5.2 and
    6.1. Where the two disagreed, the disagreement was the finding rather than something to silently match -
    and there were three of them, all now fixed in the specification (below).
-2. **One layer, complete, and named as partial.** It implements 2 of the 21 checks and says so in its own
+2. **One layer, complete, and named as partial.** It implements 6 of the 21 checks and says so in its own
    output; `conformance/README.md` states that it must not be listed as a conforming implementation. A
    second implementation that quietly covered half the table would be worse than none, because "agreement"
    would then mean less than it sounds like.
@@ -760,9 +760,19 @@ Three decisions about how it was done, which matter more than what it covered:
   it wrong and reported two disagreements that were its own - which is the cheapest possible place to learn
   that "a claim is checked before anything that depends on a key" does not tell an implementer where the
   gates are.
+- **`signature.present` is about the *fields*, not about the object.** The first version of it treated a
+  `signature` object as a pass, and the kit reported three wrong statuses on `signature-shape-broken` from the
+  first run. That is the entire argument for recording statuses rather than prose: an implementer may
+  disagree with every sentence of this project and still be told, precisely, which check they got wrong.
 
 And two vectors came out of it that would not otherwise exist: the control-character case, and
 `claim-contains-minus-zero`. Both pin behaviour that the vector set had been asserting in prose only.
+
+**The signature family followed**, with Ed25519 written from RFC 8032 in `conformance/ed25519.py`: Python's
+standard library has none, and checking a signature with the same library in two languages would be one check
+rather than two. That takes the second implementation to 6 of the 21 checks, and it means every signed
+fixture is verified twice - once by `node:crypto`, once by arithmetic written from the RFC - over a message
+built from the claim hash each implementation derived itself.
 
 ## 3. What this implementation deliberately does not have
 

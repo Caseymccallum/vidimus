@@ -93,7 +93,7 @@ both facts true, both reported, neither hidden behind the other.
 ### Verification
 
 - **Four levels, reported separately** — L0 integrity, L1 attribution, L2 time, L3 currency.
-- **Twenty named checks**, every one of which appears in every verdict.
+- **Twenty-one named checks**, every one of which appears in every verdict.
 - **A level passes only when every check in it passes.** No "pass with warnings", and an unrecognised
   thing is never a pass.
 - **Three exit codes** — `0` verified, `1` nothing proven, `2` broken — because "this receipt is
@@ -216,12 +216,13 @@ here because a format that cannot say what it grew out of is a format nobody can
 
 ## What is deliberately not here yet
 
-- **A second implementation — started.** `conformance/verify_claims.py` is the canonical form and the claim
-  hash in Python, written from the specification rather than from the reference. It agrees with the record on
-  39 of 45 fixtures, corroborates 2 refusals, and disagrees on none — and it implements 2 of the 21 checks, so
-  it is not yet a conforming implementation (D-034, `conformance/README.md`). The fixtures ship for anyone
-  extending it: `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each one must
-  produce, and a README with the three steps (D-031).
+- **A second implementation — started.** `conformance/verify_claims.py` is the canonical form, the claim hash
+  and the signature family in Python, written from the specification rather than from the reference, with
+  Ed25519 from RFC 8032 alongside it. It agrees with the record on 39 of 45 fixtures, corroborates 2 refusals,
+  and disagrees on none — and it implements 6 of the 21 checks, so it is not yet a conforming implementation
+  (D-034, `conformance/README.md`). The fixtures ship for anyone extending it:
+  `node reference/src/vectors.mjs --emit ./kit` writes 45 receipts, the verdict each one must produce, and a
+  README with the three steps (D-031).
 - **Attaching a receipt to a PDF** the way PAdES attaches a signature: a CMS `SignedData` over the
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
 - **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites.

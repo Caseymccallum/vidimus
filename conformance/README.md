@@ -7,20 +7,16 @@ corroboration."* This directory is the beginning of that, and it is deliberately
 
 ## What is here
 
-`verify_claims.py` — a Python implementation of the **canonical form and the claim hash**, working from the
-specification (`docs/RECEIPT-SPEC.md` sections 5, 5.1, 5.2 and 6.1) rather than from
-`reference/src/canonical.mjs`. It covers one layer completely instead of all of them partially:
+| File | What it is |
+| --- | --- |
+| `verify_claims.py` | The canonical form, the claim hash and the signature family, in Python, written from the specification (`docs/RECEIPT-SPEC.md` sections 5, 5.1, 5.2, 6.1, 6.3 and 6.4) rather than from `reference/`. No dependencies beyond the standard library. |
+| `ed25519.py` | Ed25519 verification, written from RFC 8032. Python's standard library has none, and checking a signature with the same library in two languages would be one check rather than two. |
 
-1. read each fixture from a conformance kit (`node reference/src/vectors.mjs --emit <dir>`);
-2. check the fixture against the digest the kit records for it;
-3. read `receipt.json` out of the container, as the bytes that were delivered;
-4. apply the gates the specification's stage order implies;
-5. re-derive the canonical form of the signed subtree, and the claim hash from it;
-6. compare both with what the kit says, and report every disagreement.
-
-It implements **no cryptography at all**, which is not a shortcut: the signature is excluded from the signed
-subtree, so deriving the claim hash needs no key and no library. It has no dependencies beyond Python's
-standard library.
+It covers **6 of the 21 checks**: `manifest.canonical`, the `spec_version` gate, the claim hash, and
+`signature.present`, `signature.alg`, `signature.key_id` and `signature.verify`. It applies the stage order
+the specification's section 6.5 implies, reads the signing message by looking the prefix up per major
+version (section 6.4), and fills in the checks a stopped stage never reached with `not_checked`, because a
+verdict contains every check (section 7.2).
 
 ```bash
 node reference/src/vectors.mjs --emit ./kit        # the fixtures and the answers
@@ -37,46 +33,47 @@ claim hashes: 39 of 45 fixtures agree
 0 disagree
 ```
 
-Two independent implementations of `canonical-json-v1`, written from the same document in two languages,
-derive the same claim hash for all 39 claims that reach it — and agree that the other six cannot be reached
-or must be refused. The four "not reached" are fixtures that are not containers or hold no parseable claim:
-the kit records the same thing (`container.readable: fail`, `manifest.parseable: fail`, and a
-`spec_version` gate), so this is agreement rather than omission — but it is listed by name, because a
-conformance report that says "no disagreement" without saying what it never looked at is the failure mode
-this project is arranged against.
+Two independent implementations of `canonical-json-v1` and of the signing rules, written from the same
+document in two languages, derive the same claim hash for every claim that reaches one, and reach the same
+verdict about the signature — including, for every signed fixture, verifying the Ed25519 signature over
+`vidimus/claim/<version>:<claim_hash>` with arithmetic in one language and a platform library in the other.
+
+The four "not reached" fixtures are not containers or hold no parseable claim: the kit records the same thing
+(`container.readable: fail`, `manifest.parseable: fail`, `spec_version: fail`), so this is agreement rather
+than omission — but it is listed by name, because a conformance report that says "no disagreement" without
+saying what it never looked at is the failure mode this project is arranged against.
 
 ## What writing it found
 
-Three things the specification said, or did not say, that only showed up when somebody implemented it
-somewhere else. All three are now fixed in the specification, and the first two have vectors.
+Four things that only showed up when somebody implemented the format somewhere else. The first three are now
+fixed in the specification, and two have vectors of their own.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
-   through `JSON.parse`, so the reference implementation rejects it there; Python's `json` returns `0`, and
-   the sign is gone before any check can see it. An implementation in that position must read the **raw
-   bytes** — which is what this one does, with a scan that tracks string state so that the characters `-0`
-   inside a string are not mistaken for a number. The specification now says so.
-2. **The escaping rule did not state the case of its hex digits.** Rule 4 escapes `"`, `\` and the C0
-   controls, using short forms for five of them — and says nothing about whether the remaining four are
-   `\u0001` or `\u0001` in some other case. The two implementations happen to agree (lowercase, as RFC 8785
-   has it), which is exactly the kind of agreement that should not be left to luck. The specification now
-   states it, and `claim-contains-a-control-character` pins it: before that vector existed, **no fixture
-   contained a control character at all**, so the whole escaping rule was unexercised.
+   through `JSON.parse`, so the reference rejects it there; Python's `json` returns `0`, and the sign is gone
+   before any check can see it. An implementation in that position must read the **raw bytes** — which is
+   what this one does, with a scan that tracks string state so that the characters `-0` inside a string are
+   not mistaken for a number. The specification now says so.
+2. **The escaping rule did not state the case of its hex digits** — and, worse, **no fixture contained a
+   control character at all**, so a whole rule was unexercised. Both implementations now agree on it byte for
+   byte, and `claim-contains-a-control-character` pins it.
 3. **The stage order is stated as a principle, not as gates.** Section 7 says a claim is checked before
-   anything that depends on a key, a third party or a network. What a second implementer needs to know is
-   narrower: an unknown `spec_version` stops *before* the canonical form is compared, and a claim that does
-   not parse records `manifest.parseable: fail` with everything after it `not_checked`. The kit records what
-   the reference did, so it is discoverable — which is what the vectors are for — but the first version of
-   this file got both wrong, and reported two disagreements that were its own.
+   anything that depends on a key, a third party or a network; what an implementer needs is narrower — an
+   unknown `spec_version` stops *before* the canonical comparison, and a claim that does not parse records
+   `manifest.parseable: fail` with everything after it `not_checked`. The kit records what the reference did,
+   so it is discoverable, which is what the vectors are for.
+4. **`signature.present` means the signature *carries the required fields*, not that it is an object.** The
+   first version of this file treated a `signature` object as a pass and got three statuses wrong on
+   `signature-shape-broken`. The kit caught it on the first run, which is the whole argument for recording
+   statuses rather than prose: an implementer can disagree with every sentence in the specification and still
+   be told, precisely, which check they got wrong.
 
 ## What this is not
 
-**It is not a conforming implementation, and it must not be listed as one.** Section 11 of the
-specification requires every check in section 7.4: this implements two of the twenty-one, and the other
-nineteen — the container's own resource hashes, the signature, the anchors, the text fingerprint, the
-document digest — are not written yet, let alone agreeing. It is one layer, finished, and it says so in its
-own output.
+**It is not a conforming implementation, and it must not be listed as one.** Section 11 requires every check
+in section 7.4: this implements 6 of the 21. The container's own resource hashes, the anchors, the text
+fingerprint, the document digest and the rest are not written yet, and several of them depend on reading a
+WACZ and a WARC rather than a claim.
 
-The next slice is the obvious one: Ed25519 over the claim hash, which turns the derived hash into a checked
-signature and covers `signature.*` for every signed fixture. Python's standard library has no Ed25519, so
-that slice needs either a dependency (which a second implementation may have — it is not the reference) or
-an independent RFC 8032 implementation.
+The next slice is **L0's container checks** — `capture.present`, `capture.bytes`, `capture.digest`,
+`capture.media_type` and `capture.wacz.readable` — which need a ZIP reader (the standard library has one) and
+the WACZ lookup, and would take the count to 11 of 21.

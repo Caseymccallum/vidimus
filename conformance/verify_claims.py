@@ -35,7 +35,14 @@ import json
 import re
 import sys
 import zipfile
+from base64 import urlsafe_b64decode
 from pathlib import Path
+
+import ed25519
+
+# Section 6.4: the message a signature covers, looked up by major version rather than built from a constant,
+# because this string is inside every signature ever produced (D-013, D-015).
+SIGNING_PREFIXES = {0: "vidimus/claim/"}
 
 # Section 5, rule 5: an integer outside this range has no single safe spelling in the languages this format
 # is meant to be read in, so it is refused rather than rounded.
@@ -195,6 +202,64 @@ def parse_manifest(raw: bytes) -> dict:
     return json.loads(text, parse_constant=refuse)
 
 
+def from_base64url(value: str) -> bytes:
+    """The bytes of a base64url field, without padding, as the claim carries them."""
+    return urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+# Section 7.4's signature checks, in the order a verdict lists them.
+SIGNATURE_CHECKS = ("signature.present", "signature.alg", "signature.key_id", "signature.verify")
+
+
+def signature_statuses(manifest: dict, derived_hash: str) -> dict:
+    """The signature checks, as this implementation sees them (sections 6.3 and 7.4).
+
+    Every check in the family comes back, including the ones a stopped stage never reached - section 7.2: a
+    verdict contains every check, and one that never ran is `not_checked`, never a pass. Filling those in is
+    not decoration: a comparison that only produced the statuses it happened to reach would report agreement
+    on a vector where three recorded statuses were never looked at.
+    """
+    signature = manifest.get("signature")
+
+    # A claim with no signature is not a failure: everything in the family is `not_applicable`, exactly as
+    # the reference reports it.
+    if signature is None:
+        return dict.fromkeys(SIGNATURE_CHECKS, "not_applicable")
+
+    def stopped(statuses: dict) -> dict:
+        """This stage stopped: everything it did not reach is `not_checked`."""
+        return {**dict.fromkeys(SIGNATURE_CHECKS, "not_checked"), **statuses}
+
+    # `signature.present` is about the signature carrying the fields the format requires, not merely being an
+    # object. Getting that wrong is what this implementation did first, and the kit caught it.
+    required = ("alg", "key_id", "public_key", "sig")
+    if not isinstance(signature, dict) or not all(
+        isinstance(signature.get(field), str) for field in required
+    ):
+        return stopped({"signature.present": "fail"})
+
+    statuses = {"signature.present": "pass"}
+
+    if signature["alg"] != "ed25519":
+        return stopped({**statuses, "signature.alg": "unsupported"})
+    statuses["signature.alg"] = "pass"
+
+    public_key = from_base64url(signature["public_key"])
+    if hashlib.sha256(public_key).hexdigest() != signature["key_id"]:
+        # A key id is derived, never asserted: one that does not match its own public key is a failure, not a
+        # reason to check the signature against the key it names.
+        return stopped({**statuses, "signature.key_id": "fail"})
+    statuses["signature.key_id"] = "pass"
+
+    prefix = SIGNING_PREFIXES.get(int(manifest["spec_version"].split(".")[0]))
+    if prefix is None:
+        return stopped({**statuses, "signature.verify": "not_checked"})
+
+    message = ("%s%s:%s" % (prefix, manifest["spec_version"], derived_hash)).encode("ascii")
+    verified = ed25519.verify(public_key, message, from_base64url(signature["sig"]))
+    return {**statuses, "signature.verify": "pass" if verified else "fail"}
+
+
 def refuses_minus_zero(raw: bytes) -> bool:
     """Whether the delivered bytes contain a `-0` number.
 
@@ -318,6 +383,15 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     elif derived != expected_hash:
         problems.append("claim hash: derived %s, kit says %s" % (derived, expected_hash))
 
+    # The signature, whose message is the claim hash this implementation just derived - which is what makes
+    # this an Ed25519 check rather than a library call with a known-good input.
+    for check_id, status in signature_statuses(manifest, derived).items():
+        recorded = checks.get(check_id, "pass")
+        if status != recorded:
+            problems.append(
+                "%s: this implementation says %s, and the kit says %s" % (check_id, status, recorded)
+            )
+
     expected_canonical = checks.get("manifest.canonical", "pass")
     try:
         whole = canonicalise(manifest).encode("utf-8")
@@ -373,7 +447,10 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers the canonical form and the claim hash only; see conformance/README.md")
+    print(
+        "this implementation covers the canonical form, the claim hash and the signature family"
+    )
+    print("(6 of the 21 checks); see conformance/README.md")
     return 0 if failures == 0 else 1
 
 
