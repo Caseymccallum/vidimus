@@ -42,6 +42,7 @@ import ed25519
 import container
 import warc
 import anchor
+import text as text_v1
 
 # Section 6.4: the message a signature covers, looked up by major version rather than built from a constant,
 # because this string is inside every signature ever produced (D-013, D-015).
@@ -245,6 +246,34 @@ def document_status(inner: dict[str, bytes] | None, manifest: dict) -> tuple[str
     return ("pass", None)
 
 
+def text_status(manifest: dict, inner: dict[str, bytes] | None) -> dict:
+    """`subject.text`: the words, re-extracted from the capture (section 4.5).
+
+    The fingerprint is derived, never supplied - so a claim that carries one is checked by extracting the
+    document from the capture's own bytes and hashing what comes out. A capture this reader cannot open is
+    `not_checked`, for the same reason `subject.document` is: a verifier that half-reads a document reports a
+    change that did not happen, and a claim is not made false by a verifier's limits.
+    """
+    subject = manifest.get("subject")
+    fingerprint = subject.get("text") if isinstance(subject, dict) else None
+
+    if fingerprint is None:
+        return {"subject.text": "not_applicable"}
+    if not isinstance(fingerprint, dict) or fingerprint.get("normalization") != "text-v1":
+        # A normalisation this verifier does not implement is its own limit, not a fault in the receipt.
+        return {"subject.text": "unsupported"}
+    if inner is None:
+        return {"subject.text": "not_checked"}
+
+    try:
+        body = warc.main_document(inner, subject.get("url"))
+    except warc.WarcError:
+        return {"subject.text": "not_checked"}
+
+    actual = text_v1.fingerprint(body)
+    return {"subject.text": "pass" if actual == fingerprint.get("sha256") else "fail"}
+
+
 def from_base64url(value: str) -> bytes:
     """The bytes of a base64url field, without padding, as the claim carries them."""
     return urlsafe_b64decode(value + "=" * (-len(value) % 4))
@@ -276,6 +305,7 @@ MODELLED_CHECKS = (
     "signature.verify",
     "anchor.present",
     "anchor.verified",
+    "subject.text",
 )
 
 
@@ -431,19 +461,21 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
         return (["the claim is not a JSON object, and the kit records no failure for that"], "agreed")
     statuses["manifest.parseable"] = "pass"
 
-    def finish(statuses: dict, derived: str | None) -> tuple[list[str], str]:
-        """Add the attribution and anchor checks, which run whenever a claim parsed.
+    def finish(statuses: dict, derived: str | None, inner: dict[str, bytes] | None = None) -> tuple[list[str], str]:
+        """Add the attribution, anchor and text checks, which run whenever a claim parsed.
 
-        A claim that failed its own stage still says who signed it and what it is anchored to, and the record
-        reports both - so these run however the claim itself went. The anchor checks need the signature's
-        verdict (a chain anchor commits to a position at signing time, D-012) and the claim hash (an RFC 3161
-        token's imprint is compared against it), so they come last.
+        A claim that failed its own stage still says who signed it, what it is anchored to and what words it
+        claims - and the record reports all three, so these run however the claim itself went. The anchor
+        checks need the signature's verdict (a chain anchor commits to a position at signing time, D-012) and
+        the claim hash (an RFC 3161 token's imprint is compared against it); the text check needs the
+        capture's document, which is None when the earlier stages never read one.
         """
         signature = signature_statuses(manifest, derived)
         statuses.update(signature)
         statuses.update(anchor.anchor_statuses(
             manifest, options, derived, signature["signature.verify"],
         ))
+        statuses.update(text_status(manifest, inner))
         return (compare(fill(statuses), checks), _outcome(statuses, checks))
 
     version = manifest.get("spec_version")
@@ -497,7 +529,7 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
         if key != "container.readable"
     })
     statuses["subject.document"] = document_status(inner, manifest)[0]
-    return finish(statuses, derived)
+    return finish(statuses, derived, inner)
 
 
 def _outcome(statuses: dict, checks: dict) -> str:
@@ -558,8 +590,9 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers 20 of the 21 checks: everything except the text fingerprint;")
-    print("see conformance/README.md")
+    print("this implementation covers all 21 checks of section 7.4, and agrees with the record on")
+    print("every status it compares; it does not yet assemble a whole verdict, which section 11 wants")
+    print("field by field - see conformance/README.md")
     return 0 if failures == 0 else 1
 
 

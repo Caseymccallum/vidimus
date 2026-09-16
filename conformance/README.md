@@ -14,10 +14,10 @@ corroboration."* This directory is the beginning of that, and it is deliberately
 | `warc.py` | The record layer: the magic that separates records, the HTTP block, the WARC-Payload-Digest a record states for itself, and the body cut to the length the response declares. The smallest reader that can answer one question - what was the main document (section 4.2). |
 | `anchor.py` | Both anchor checks: the chain links of section 8.2, and the RFC 3161 tokens of section 8.3. |
 | `der.py`, `x509.py`, `rfc3161.py` | A DER reader, the four fields this project needs from a certificate, and the four things section 8.3 requires before a token may be reported as `pass` - including RSA PKCS#1 v1.5 verification by modular exponentiation. |
+| `text.py` | `text-v1`: the seven rules of section 4.5.1, as a deterministic walk over a document's bytes. |
 | `ed25519.py` | Ed25519 verification, written from RFC 8032. Python's standard library has none, and checking a signature with the same library in two languages would be one check rather than two. |
 
-It covers **20 of the 21 checks**: everything except `subject.text`, the `text-v1` fingerprint, which needs an
-extractor rather than a rule.
+It covers **all 21 checks** of section 7.4.
 
 **Two of those layers are weaker checks than the others, and it is worth saying which.** The container, the
 claim and the signature layers were written from `docs/RECEIPT-SPEC.md` alone, with `reference/` unopened -
@@ -52,20 +52,22 @@ claim hashes: 42 of 45 fixtures agree
 
 Every check this implementation models has, for every fixture, the status the reference recorded — including
 the Ed25519 signatures, verified with arithmetic written from RFC 8032 over a message built from the claim
-hash this implementation derived itself, and including an **RFC 3161 timestamp token**: its CMS structure, its
+hash this implementation derived itself; including an **RFC 3161 timestamp token**: its CMS structure, its
 certificate, the two signed-attribute bindings, the `messageImprint` against the claim hash, and an RSA
-PKCS#1 v1.5 signature verified by modular exponentiation, against a platform library on the other side. The
-three refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not
-read), and the record agrees that they are refused.
+PKCS#1 v1.5 signature verified by modular exponentiation; and including the **`text-v1` fingerprint**, the
+words extracted from the capture's document by the seven rules of section 4.5.1 and hashed as UTF-8. The three
+refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not read),
+and the record agrees that they are refused.
 
 Every status each check can produce is exercised across those 45 fixtures: all four of `anchor.verified`
-(`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, and both the refusals and the
-stage gaps of the claim checks. A conformance run that only ever saw the happy path would agree with a
-reference that did nothing.
+(`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, the `pass` and `fail` of the
+text fingerprint and its `not_applicable` when a claim carries none, and both the refusals and the stage gaps
+of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
+nothing.
 
 ## What writing it found
 
-Eight things that only showed up when somebody implemented the format somewhere else. Two are fixed in the
+Nine things that only showed up when somebody implemented the format somewhere else. Two are fixed in the
 specification; the rest are named as open, because a list that reads as if it were closed is worse than no
 list at all.
 
@@ -106,6 +108,15 @@ list at all.
    the key usage, the validity window - checking out. The vectors caught it in one run, and an implementer with
    no vectors would have concluded the TSA was lying.
 
+9. **`text-v1` leaves three things to the reader, and a fingerprint cannot afford that.** Section 4.5.1 is
+   otherwise a model of how to write an extraction down - seven rules, a named element list, a stated
+   degradation for malformed markup - and it does not say **which characters count as whitespace** for rule 5,
+   **which named character references are known** ("no full HTML5 entity table" rules some out, and names
+   none), or **how a document that is not UTF-8 becomes characters** at all. Each is a difference that changes
+   the digest, and a digest that differs between two implementations is the failure this section exists to
+   prevent. This implementation's three answers are stated in `text.py` rather than buried, but they are
+   answers it had to invent.
+
 And two about *when* checks run, which the specification states as a principle and an implementer needs as a
 picture. Both were reported by the kit as disagreements, and both were this implementation's fault:
 
@@ -129,10 +140,14 @@ second implementer can follow without asking anybody anything.
 
 ## What this is not
 
-**It is not a conforming implementation, and it must not be listed as one.** Section 11 requires every check
-in section 7.4: this implements 20 of the 21, and the one it does not — `subject.text` — needs a `text-v1`
-extractor (section 4.5), which is a different kind of work from everything above.
+**It is not a conforming implementation, and it must not be listed as one - yet, and for a new reason.**
+Section 11 requires every check in section 7.4, and this now implements all 21 of them and agrees with the
+record on every status it compares. What it does not do is produce a **verdict**: no `verified`, no level
+rollups, no capture profile, no attribution, no time bound, no caveat count, no exit code. The kit's README
+says a conformance run compares the verdict "field by field", and a run that compared only the checks would
+be claiming more than it tested.
 
-Writing it went from 2 checks to 20 in four slices, and the shape of what remains is the interesting part:
-every check that could be decided from the bytes has been, and the last one cannot be, because it asks what
-the *words* are.
+That is the next slice, and it is a small one: derive `levels` from the checks (section 7.3), `verified` from
+the levels, `exit_code` from `verified`, and compare those fields too. Until then this directory is evidence
+that the *rules* are implementable from the specification by somebody who did not write it - which is what it
+was for - and not yet evidence that an independent implementation can produce this project's output.
