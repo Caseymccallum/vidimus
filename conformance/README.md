@@ -124,7 +124,7 @@ argument for a rule that a reader cannot talk back to.
    specification now states the list** (section 12), and the guess turned out to match it exactly - which is
    luck, not method: the guessing is the finding, not whether it happened to be right.
 
-8. **What a timestamp token's signature covers is not stated.** Section 8.3 lists the CMS bindings a token
+6. **What a timestamp token's signature covers is not stated.** Section 8.3 lists the CMS bindings a token
    must carry - the signed attributes must name the `TSTInfo`, and must carry its digest - and says nothing
    about the fact that what is *signed* is those attributes **re-tagged** as a `SET OF`: the same bytes after
    the tag that identifies them, length octets included. My first version reconstructed them from the `[0]`
@@ -133,7 +133,7 @@ argument for a rule that a reader cannot talk back to.
    the key usage, the validity window - checking out. The vectors caught it in one run, and an implementer with
    no vectors would have concluded the TSA was lying. **Now stated** in section 8.3.
 
-Nine findings, six of them closed by changing the specification rather than the code:
+Nine findings, eight of them closed by changing the specification rather than the code:
 
 | Finding | Now stated in |
 | --- | --- |
@@ -141,14 +141,19 @@ Nine findings, six of them closed by changing the specification rather than the 
 | 2. Escaping did not say the case of its hex digits | Section 5.1, rule 4 - and pinned by `claim-contains-a-control-character` |
 | 4. The WARC-reading rules a digest depends on | Section 9: record separation, the `Content-Length` cut, the truncation refusal, the payload digest |
 | 5. The safe-entry-name enumeration | Section 12: the length, the leading slash, the backslash, the colon, `//`, and the dot segments |
-| 8. What a timestamp token's signature actually covers | Section 8.3: the attributes re-tagged as a `SET OF`, length octets and all |
-| 9. Whitespace, named references and decoding in `text-v1` | Section 4.5.1 rules 5 and 6, and section 4.5.2 (D-035) |
+| 6. What a timestamp token's signature actually covers | Section 8.3: the attributes re-tagged as a `SET OF`, length octets and all |
+| 7. Whitespace, named references and decoding in `text-v1` | Section 4.5.1 rules 5 and 6, and section 4.5.2 (D-035) |
 
-The three that remain open are #3 (the shape of the stage structure), #6 (the stage order as a picture) and #7
-(the `signature.present` reading) - all three about *when* a check runs rather than what it means, and all
-three discoverable from the vectors, which is the mechanism working as intended.
+**All nine are now closed**, and the last one closed differently from the other eight. #8 - the stage structure,
+and the four rules about *when* a check runs - is now section 7.3.1, which is the part of the specification I
+would have said was already covered before a second implementation read it. #3 is the other kind of finding and
+was never a missing rule: the check table has said "carries a signature with the required fields" from the
+first draft, and this implementation read the check's *name* instead of the sentence, passed a claim whose
+signature had no `sig` in it, and reported three wrong statuses. Same failure as the entity list in D-035 - a
+rule that looks stated until somebody follows it - and why this directory runs against the vectors rather than
+against its own understanding of the prose.
 
-9. **`text-v1` left three things to the reader, and it now does not.** Section 4.5.1 was otherwise a model of
+7. **`text-v1` left three things to the reader, and it now does not.** Section 4.5.1 was otherwise a model of
    how to write an extraction down - seven rules, a named element list, a stated degradation for malformed
    markup - and it did not say **which characters count as whitespace** for rule 5, **which named character
    references are known** ("no full HTML5 entity table" ruled some out and named none), or **how a document
@@ -168,7 +173,7 @@ three discoverable from the vectors, which is the mechanism working as intended.
 And two about *when* checks run, which the specification states as a principle and an implementer needs as a
 picture. Both were reported by the kit as disagreements, and both were this implementation's fault:
 
-6. **The stages are not a chain.** A claim that fails the *claim* stage still has its **signature** checked:
+8. **The stages are not a chain.** A claim that fails the *claim* stage still has its **signature** checked:
    attribution depends on a manifest having parsed, not on the claim being sound. This implementation
    modelled a linear pipeline, so a receipt with an unknown `spec_version` reported three attribution statuses
    as `not_checked` where the record says `pass`. Equally, a claim whose bytes are not canonical is
@@ -196,7 +201,7 @@ Section 11 lists four conditions, and this implementation meets them:
    reached filled in as `not_checked` rather than omitted;
 2. **the status, level-rollup and `verified` rules of sections 7.1-7.5** - derived independently and compared,
    and agreeing;
-3. **the canonical form, byte for byte, including the refusals** - 45 of 50 fixtures agree, and the three
+3. **the canonical form, byte for byte, including the refusals** - 47 of 50 fixtures agree, and the three
    refusals are corroborated as refusals rather than passed over in silence;
 4. **the recorded verdicts** - comparing every rule-derived field, and agreeing on all nine distinct
    combinations of `attribution`, `time_bound` and `capture_profile` the fixtures contain.

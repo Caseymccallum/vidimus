@@ -611,6 +611,33 @@ warnings". A level whose checks are a mix of `pass` and `not_checked` is `not_ch
 the moment a partially examined level can print as verified, the level stops meaning anything.
 `fail` outranks everything; then `unsupported`; then `not_checked`.
 
+### 7.3.1 When a check runs
+
+A verdict contains every check (section 7.2), so a check that never ran has a status too: `not_checked`, with a
+reason. Which checks run is **not a single chain**, and an implementation that models it as one reports statuses
+that disagree with this specification in ways that look like faults in a receipt. Four rules - each of which a
+second implementation had to learn from a vector rather than from this document:
+
+1. **The claim's own stage stops at its first refusal.** A container that is not a ZIP, a `receipt.json` that is
+   missing or does not parse, a claim that has no canonical form at all, or a `spec_version` this verifier does
+   not read: each stops the claim stage, and the checks after it are `not_checked`.
+2. **A check that fails is not a stage that stops.** `manifest.canonical: fail` means the delivered bytes were
+   not the canonical form of the claim - which is a failure, and the verdict carries on. The claim hash is
+   derived from the *parsed* claim, so a claim delivered untidily still has one, and everything that depends on
+   it runs and is reported.
+3. **Attribution and time do not depend on the claim being sound.** A claim that stopped at its own stage still
+   says who signed it and what it is anchored to, so `signature.*` and `anchor.*` are reported against whatever
+   claim hash could be derived - and `signature.verify` is `not_checked` when none could be. A signature that
+   cannot be checked is not a signature that failed.
+4. **The capture's stage is gated by the shape, not by the claim.** A claim that failed the canonical form
+   still has its capture digested and its document read; a claim whose *shape* is wrong - an entry name outside
+   the archive, a required field missing - does not, because the names in it are not names to look anything up
+   by.
+
+One reading to get right, rather than a rule to state: `signature.present` asks whether the signature carries
+the fields it must, **not** whether it is an object. A verifier that reads only the check's name will pass a
+claim whose signature has no `sig` in it, and three statuses will disagree with a correct one.
+
 ### 7.4 The checks
 
 | Check | Level | Holds up when |
