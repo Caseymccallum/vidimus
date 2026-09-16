@@ -29,7 +29,7 @@ npm run verify      # syntax, then tests, then the vectors
 | `npm test` | 153 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
-| `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. `--trusted-key` and `--key-directory` are how a caller answers "whose key is this?" (section 6.7 of the specification). |
+| `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. `--trusted-key`, `--key-directory` and `--tsa` are how a caller answers "whose key signed this?" and "whose timestamp is this?" (sections 6.7 and 8.3 of the specification). |
 | `node reference/src/cli.mjs keys <directory.json>` | Reads a key directory and says what is in it, refusing the entries it will not use rather than waiting for a receipt to fail against them. |
 | `node reference/src/cli.mjs check <file>` | The comparison with the page as it is now: the only command that makes a request, and the only one whose output includes a currency report. `--require-same-words` makes that report, rather than the receipt, decide the exit code. |
 | `node reference/src/cli.mjs seal <capture.wacz> --key <key.json>` | The producer: it builds a claim from a capture, signs it, and verifies its own output before reporting success (D-017). |
@@ -95,9 +95,11 @@ Grouped by what they are for:
 - **Verdicts are reproducible.** The same bytes produce byte-identical verdicts, asserted for every
   case.
 
-## 6. What is not conformant yet
+## 6. What is limited, and what is not conformant yet
 
-Named here, with what each would take, so that none of them is mistaken for a decision.
+Named here, with what each would take, so that none of them is mistaken for a decision. The first row is a
+limit inside something that *is* implemented, which is why this section is not titled "gaps" any more:
+a limitation written down is part of conformance, and one left implicit is a claim nobody made.
 
 | Gap | Where it shows | What it would take |
 | --- | --- | --- |

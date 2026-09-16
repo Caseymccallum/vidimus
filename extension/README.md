@@ -32,6 +32,13 @@ the two producers cannot drift apart (D-018).
 - **It says what kind of capture it holds.** Its claims declare `capture.profile: "document-v1"` - the
   document as the browser rendered it. That is a different claim from one holding the bytes a server
   sent, and a reader deciding whether a receipt is good enough now has a way to tell the two apart.
+- **It declares the words it captured, and checks them.** Every claim it writes carries a `text-v1`
+  fingerprint of the rendered document, so "did the page's words change?" is answerable years later
+  without re-reading the page - and the check runs here, in this browser, from the capture's own bytes
+  rather than from anything the page says now.
+- **It can check a receipt that carries a timestamp.** An RFC 3161 anchor is validated against a TSA
+  certificate the *caller* pins; the extension does not ship one, so an anchored receipt checked here
+  reports what it could not validate rather than implying it did.
 - **It asks for `<all_urls>`.** That host permission is what makes a response status observable; without
   it the claim would carry no `status` and no `content_type` (both optional in the format). A real trade,
   and the first one to revisit.

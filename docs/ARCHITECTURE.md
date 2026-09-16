@@ -143,6 +143,16 @@ content that never changed, and the user learns to distrust the tool instead of 
 
 ### D-009 - `text-v1` is delegated to a DOM engine, and the CLI says `not_checked`
 
+> **Superseded by D-024.** Everything below was reversed: the fingerprint is defined over the document's
+> *bytes* (specification section 4.5) and the CLI checks it. It stays here because the reversal is the
+> interesting part.
+>
+> D-024's answer to the objection in the last paragraph: there is still only *one* extractor, used by both
+> runtimes, so the disagreements this decision was protecting against cannot arise - and the premise it
+> rested on ("the reference CLI has no HTML engine") was never the obstacle it looked like, because the
+> rules are a walk rather than a layout. What was really missing was a written-down definition; the
+> hand-written extractor this decision rejected is `text.mjs`, and it is the *only* one.
+
 The `subject.text` fingerprint is defined over a *rendered* document, using the same deterministic
 walk Shelf performs when it indexes a page. The reference CLI has no HTML engine, so it validates the
 declaration and reports the check as `not_checked` with that reason.
@@ -274,7 +284,7 @@ one's own verification is the kind of flag that ends up in a script nobody re-re
 
 `capture.mjs` turns what a browser knows into a WACZ: one WARC response record, gzipped, inside a
 container that advertises it. It lives in the reference implementation rather than in the extension,
-which means the extension will import it - and that is the point. There is one definition of what a
+which means the extension imports it - and that is the point. There is one definition of what a
 capture is, and the code that makes a capture and the code that reads one cannot drift apart.
 
 The alternative - the extension building its own container - is the failure this repository exists to

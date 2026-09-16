@@ -29,9 +29,10 @@ A draft, and the version number says so. The reference implementation in `refere
 in `spec/vectors/receipt-vectors.json` are the record of what it answers, and
 `npm run verify` re-derives that record on every run.
 
-Two things are deliberately unfinished and named rather than implied: RFC 3161 anchors
-(section 8) and the comparison of a receipt with the page as it is now (section 9).
-`docs/CONFORMANCE.md` lists them alongside what each would take.
+Two things are deliberately unfinished and named rather than implied: size limits for untrusted input
+and a claim that spans several URLs. `docs/CONFORMANCE.md` lists them alongside what each would take.
+Everything this document describes is implemented, including the anchors, the text fingerprint and the
+comparison with the page as it is now.
 
 ## 1. Scope
 
@@ -813,7 +814,7 @@ a limitation somebody will assume away.
 | WARC parsing, and re-deriving `subject.document` | no check; the **producer** does it | A half-parser that disagrees with a real one reports a *false change*, which is worse than reporting no change. The producer must derive it and refuse when it cannot (section 4.2, D-016). |
 | Comparing that re-read document with `subject.document.sha256` | no check | The verifier re-reads a capture's document to check the text fingerprint (section 4.5), and does not compare it with the document digest the claim states. So a claim whose `subject.document` described a *different* document would still verify on integrity: what L0 establishes is "these are the bytes this receipt names", not "this claim describes them". A candidate check for 0.2, named here rather than assumed away. |
 | Whether a capture holds the wire bytes or the rendered document | `capture.profile` (section 4.4) | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. A claim now says which kind of capture it holds, and a verifier reports what it declared without judging it: what a capture holds cannot be worked out from its bytes, which is why the field exists. |
-| RFC 3161 token validation | `anchor.verified` | Section 8.3. The check reports `unsupported`, never `pass`. |
+| RFC 3161 token validation | `anchor.verified` | **Done**, against a TSA the caller pins (section 8.3). What is still not done is named there and in `docs/CONFORMANCE.md`: no chain building to a root, no revocation checking, and a stated list of algorithms. |
 | Level 3 (currency) | `subject.text`, and the report in section 7.7 | The verifier checks the claim's own fingerprint (section 4.5) and never fetches anything. Whether the page still says the same words is a comparison with its own report, performed by a caller that asks for it - `vidimus check` - and it **MUST NOT** be folded into `verified`. |
 | Key directories and trust roots | `attribution.trusted_by` | A **caller** supplies the directory. The format deliberately defines no signature for one and no network fetch of it: trust arrives from the caller or not at all (section 6.7, D-007). Revocation is a directory revision rather than a protocol. |
 | Size limits | `container.readable` | Nothing here caps entry sizes, so a hostile receipt can ask a verifier to inflate a large entry. A caller reading untrusted receipts **SHOULD** cap the file it opens, and a 0.2 verifier **SHOULD** refuse declared sizes above a bound. Named because the current behaviour is "it works until it does not". |
@@ -877,28 +878,32 @@ still disagree about everything a user cares about.
 
 ## 13. Open questions for 0.2
 
-Written down now, with the reason each is deferred:
+The 0.1 draft listed eight. Six have landed, and saying which is part of keeping this document honest:
 
-1. **RFC 3161 validation** (section 8.3). The specification is complete; the implementation is the
-   work, and it is the first thing to pick up.
-2. **`text-v1` in a verifier.** It needs an HTML engine. The natural home is the extension, which
-   already has one - Shelf's `extractText` is the normative definition, so a verifier that reuses
-   it conforms by construction (D-009).
-3. **Level 3 as a procedure**: what to fetch, what to compare, and how to report "the page changed
-   but the words did not". It needs a comparison report format, and it needs to be impossible to
-   run by accident.
-4. **Size limits** for untrusted input (section 9).
-5. **Key directories.** A `.well-known` document, or simply a `receipt-keys.json`. Deliberately
-   absent until there is a second implementer to disagree with about it.
-6. **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites.
-7. **Attaching a receipt to the thing it supports**: a citation manager entry and a commit trailer are done
-   (`vidimus cite`, section 6.7 does not cover this - see `docs/ARCHITECTURE.md` D-028), and the two that
-   remain are named with what each would take. **A PDF**, in the shape PAdES uses: a CMS `SignedData` over
-   the document's byte range, written into an incremental update, with the receipt as an embedded file.
-   That is real work and the alternative is worse - an attachment no viewer can verify looks like evidence
-   and is not. **A `.well-known` directory fetch**: a key directory reached over the network is one an
-   attacker can replace, so fetching it stays a caller's deliberate act rather than something a verifier
-   does on its own (section 6.7).
-8. **Filling in the profiles.** `document-v1` is defined and produced (section 4.4); a *wire* profile
-   needs a name and something that can write one, which means a crawler rather than a browser extension.
-   Naming it before anything can produce it would be a name with no meaning.
+| Was open | Now |
+| --- | --- |
+| RFC 3161 validation | Implemented against a TSA the caller pins (section 8.3, D-029). |
+| `text-v1` in a verifier | Defined over bytes and checked offline (section 4.5, D-024) - it never needed an HTML engine, only a definition written down. |
+| Level 3 as a procedure | The comparison is specified with its own report (section 7.7, D-025) and performed by `vidimus check`. The level itself checks the claim's own fingerprint. |
+| Key directories | Specified and implemented (section 6.7, D-027). Trusted because chosen, not because signed. |
+| Filling in the profiles | `document-v1` and `wire-v1` are both named; nothing yet *produces* a wire capture automatically, because that is a crawler's job rather than a browser's. |
+| Attaching a receipt to what supports it | Citations and commit trailers are done (D-028). A PDF is not - see below. |
+
+Still open, with the reason each is deferred:
+
+1. **Size limits** for untrusted input (section 9). A hostile receipt can declare a large entry and ask a
+   verifier to inflate it. The shape of the fix is a cap applied *before* inflating, plus a status for a
+   receipt that exceeds it - and the reason it is deferred is that the right default depends on what
+   people actually store, which nobody knows yet.
+2. **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites. It is a
+   change to the claim's shape rather than to any check, and it should wait until somebody needs it.
+3. **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
+   check the text fingerprint (section 4.5) and does not compare that document with the digest the claim
+   states. Comparing them is a *new check*, not new code, so it needs the full ceremony section 7.4
+   describes - including a vector that fails without it.
+4. **A second implementation.** Not a question for this document, and the most valuable thing anybody
+   could do with it: the vectors currently pin one implementation's answers, which is agreement rather
+   than corroboration. `CONTRIBUTING.md` says so first.
+5. **A PDF attachment in the shape PAdES uses**, and a `.well-known` directory fetch. Both are deferred
+   on purpose rather than for want of time: the first needs a CMS `SignedData` over a byte range, and the
+   second is a network fetch a verifier must never make on its own initiative (section 6.7).

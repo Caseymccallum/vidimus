@@ -29,8 +29,10 @@ reports which parts of the claim held up.
 - **Capture substitution.** `capture.digest` binds the exact capture bytes, and
   `capture.wacz.resources` binds what is *inside* them, so swapping the inner record for another
   one of the same length is caught.
-- **A fabricated anchor.** An anchor that could have existed at signing time is signed (D-011),
-  and a chain anchor cannot pass without a valid signature (D-012).
+- **A fabricated anchor.** An anchor that could have existed at signing time is signed (D-011); a chain
+  anchor cannot pass without a valid signature (D-012); and an RFC 3161 token cannot pass unless it
+  commits to *this* claim's hash (section 8.3) and is signed by a timestamping authority the caller
+  pinned. A token therefore cannot be moved from one receipt to another, and cannot be invented for one.
 - **Its own report overstating what it found.** Every check appears in every verdict, a level
   passes only when every check in it passes, and an unknown is never a pass (D-005). This is the
   threat this project takes most seriously, because it is the one the user cannot see.
@@ -79,14 +81,26 @@ misread them:
   that true rather than merely intended.
 - **A receipt cannot affect anything.** It is bytes. Nothing here blocks, redirects, rewrites or
   observes a request.
-- **The verifier never trusts the claim for anything it can compute.** Digests, key ids, lengths and
-  hashes are recomputed from the bytes. The fields a verifier *cannot* recompute - the document
-  digest, the text fingerprint, the signer's name - are the ones section 9 of the specification
-  names as unchecked, and they are reported as unchecked rather than presented as findings.
+- **The verifier never trusts the claim for anything it can compute.** Digests, key ids, lengths, hashes
+  and the text fingerprint are recomputed from the bytes. The fields a verifier does *not* recompute -
+  `subject.document`, and the name a claim gives its signer - are named as unchecked in section 9 of the
+  specification, and are reported as unchecked rather than presented as findings. A key directory is how
+  a caller answers the second of those; it is the caller's document, never this project's (section 6.7).
 - **An anchor is trusted only as far as its own rules.** A chain anchor is checked for internal
-  consistency, not confirmation. An RFC 3161 token is not trusted at all yet, and the check says
-  `unsupported` rather than passing it.
-- **The key list belongs to the caller.** Trust roots are configuration, never a built-in list.
+  consistency, not confirmation: it orders receipts inside one archive and attests nothing to a stranger.
+  An RFC 3161 token is validated against a certificate *the caller pinned*, by DER or fingerprint, and
+  a token signed by anything else is `not_checked` - so the verdict never implies a trust decision the
+  caller did not make (D-029).
+- **The key list and the TSA list belong to the caller.** Trust roots are configuration, never a built-in
+  list: this project ships no authority bundle, and a verifier with nothing pinned calls nothing trusted.
+- **The comparison with the page now makes a request, and cannot change a verdict.** `vidimus check`
+  fetches the URL a receipt cites, seals what it finds into a *second* receipt, and prints a report
+  beside the verdict. The bytes it fetches reach that report and nothing else, and no level of the
+  verdict depends on them (D-025).
+- **The extension makes requests while capturing.** It fetches the stylesheets and images a page
+  references, because a browser will not hand over the body of a response the page made. Those responses
+  become data inside the capture, they are addressed by URL, and they cannot execute when the capture is
+  replayed. How many were kept and how many were left out is reported to the user.
 
 ## 5. Where it can be wrong
 
@@ -94,9 +108,15 @@ misread them:
   receipt that verifies and a record that is incomplete. The 0.1 format has no field for "what this
   capture could not save", so a producer that wants to be honest about that has to put it in the
   claim - an undocumented field is signed, so it travels with the claim rather than being dropped.
-- **The text fingerprint is not checked here.** `text-v1` needs a rendered document, and the
-  reference verifier has no HTML engine. It reports `not_checked` and says why. A verdict showing
-  `subject.text: not_checked` is not a failed check; it is a check nobody did.
+- **The text fingerprint is checked, and it is not the whole page.** `text-v1` is defined over the
+  document's bytes (section 4.5), so a verifier recomputes it and reports `pass` or `fail` rather than
+  `not_checked`. What it cannot see is layout: text hidden by a *stylesheet* is in the fingerprint,
+  because only an element's own `hidden`, `aria-hidden` or inline `style` excludes it. A page that hides
+  words by class name is a page whose words did not change.
+- **A revoked TSA certificate still verifies.** Nothing here consults a revocation list, so a token
+  signed by a certificate that was valid at the time and revoked since still passes L2. The
+  specification says so next to the rule it belongs to (section 8.3), because a verifier that implied
+  "valid certificate" while checking no revocation would be answering a question it was not asked.
 - **A chain anchor's claim about its own position.** `sequence: 1` always passes, because "this is
   the first receipt" is unfalsifiable from one receipt. It is a complete statement and a weak one.
 - **Timestamps to the second.** Two captures within the same second are indistinguishable by time.

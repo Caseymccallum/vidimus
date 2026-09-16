@@ -36,7 +36,7 @@ subject https://example.org/a-page-worth-citing · captured 2026-01-01T00:00:00Z
 L0 integrity: verified — these are the bytes this receipt names
 L1 attribution: verified — the named key signed this claim
 L2 time: not checked — a third party attested the claim existed at a time
-L3 currency: not applicable — the page still matches, as of now
+L3 currency: not applicable — the words in the capture are the words the claim fingerprints
 signed by key 94161df6… (Fixture Signer <fixture@example.org>)
 1 caveat
 ```
@@ -52,9 +52,10 @@ both facts true, both reported, neither hidden behind the other.
 > detect. [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) is the full list, ordered by how easy each
 > one is to misread.
 
-> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 153 tests,
-> 41 conformance vectors, no dependencies. The extension that will make a receipt in one click is the
-> next piece of work. The format had to be checkable before anything wrote it at scale.
+> **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
+> browser extension: 153 tests, 41 conformance vectors, no dependencies. The format is checkable and is
+> being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
+> left to be discovered.
 
 ## Feature Highlights
 
@@ -96,12 +97,13 @@ both facts true, both reported, neither hidden behind the other.
 
 ### The format
 
-- **A specification with conformance vectors**, not merely an implementation: 34 recorded fixtures and
+- **A specification with conformance vectors**, not merely an implementation: 41 recorded fixtures and
   verdicts, rebuilt and re-hashed on every run.
 - **A canonical form that admits integers only**, because floating-point formatting is where
   cross-language signature schemes break.
-- **Time anchors named honestly** — none, a chain, or an RFC 3161 token — each with what it does and
-  does not prove, and `unsupported` where an implementation has not got there yet.
+- **Time anchors named honestly** — none, a chain, or an RFC 3161 token. A token is validated against a
+  timestamping authority *you* pin, never one this project ships, and the verdict reports an instant a
+  third party attested as a bound ("existed no later than"), never as a capture time.
 - **The artefact is called a receipt; the project is called Vidimus.** A stranger reading
   `citation.receipt` needs no explanation.
 
@@ -110,9 +112,9 @@ both facts true, both reported, neither hidden behind the other.
 - **No dependencies and no build step.** Plain ESM with JSDoc types, run by `node --test`.
 - **The verifier is pure** — no clock, no filesystem, no network — and a test scans its source to keep
   that true rather than merely intended.
-- **Six gates, each shown to be able to fail**, and two of them are about the documentation itself: the
+- **Five gates, each shown to be able to fail**, and two of them are about the documentation itself: the
   prose is checked for British English, and the counts the README quotes are checked against reality.
-- **The capture chain is browser-safe by test.** Everything the extension will bundle - the canonical
+- **The capture chain is browser-safe by test.** Everything the extension bundles - the canonical
   form, the SHA-256, the gzip and ZIP writers, the capture itself - imports nothing from Node, and a
   test walks the import graph from `capture.mjs` and fails on the first breach (D-018).
 
@@ -137,9 +139,9 @@ exists today:
 - a producer that turns a capture into a signed receipt, and verifies its own output before reporting
   success;
 - a capture core that turns what a browser knows into a WACZ - browser-safe, and the module the
-  extension will import rather than reimplement (`capture.mjs`);
+  extension imports rather than reimplements (`capture.mjs`);
 - 41 conformance vectors, rebuilt and re-hashed on every run;
-- six gates, run by `npm run verify` and by CI on Linux and Windows.
+- five gates, run by `npm run verify` and by CI on Linux and Windows.
 
 The browser shell exists now too, in `extension/`: one button that seals the page you are reading,
 importing the format rather than reimplementing it, and keeping its signing key in the browser.
@@ -207,9 +209,6 @@ here because a format that cannot say what it grew out of is a format nobody can
 
 ## What is deliberately not here yet
 
-- **The browser shell.** `capture.mjs` turns a page's facts into a WACZ; what is missing is the
-  extension that gathers those facts - the rendered DOM, the observed status and headers - calls the
-  capture core, seals the receipt and keeps the key.
 - **A second implementation.** The conformance vectors pin one implementation's answers, which is
   agreement rather than corroboration, and a second reading of the same vectors is the biggest single
   gap. `CONTRIBUTING.md` says so first.
@@ -220,8 +219,6 @@ here because a format that cannot say what it grew out of is a format nobody can
   document's byte range, in an incremental update. A sidecar and a citation line work today (D-028).
 - **Size limits** for untrusted input. Named in the specification and the threat model rather than
   silently absent.
-- **Key directories** - who a key belongs to. Deliberately absent until there is a second
-  implementation to disagree with about it.
 
 ## Citing it
 
