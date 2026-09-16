@@ -36,7 +36,7 @@
  * @module cli
  */
 
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { exitCode, verifyReceipt } from './verify-node.mjs';
 import { SealError, sealFromCapture } from './seal.mjs';
 import { sha256, fromBase64Url, toBase64Url } from './digest.mjs';
@@ -45,6 +45,7 @@ import { buildCapture } from './capture.mjs';
 import { compareCurrency } from './currency.mjs';
 import { textDigest } from './text.mjs';
 import { KEY_DIRECTORY_KIND, readKeyDirectory } from './key-directory.mjs';
+import { citationFor, indexEntry } from './cite.mjs';
 
 /** Every command, printed when the arguments do not make sense. */
 const USAGE = [
@@ -58,6 +59,8 @@ const USAGE = [
   '                       [--chain <n> --prev <hash>] [--out <file.receipt>] [--force] [--json]',
   '       vidimus keygen  [--out <key.json>] [--signer <name>] [--force]',
   '       vidimus keys    <directory.json>',
+  '       vidimus cite    <file.receipt> [--json] [--title <text>] [--index <file>]',
+  '                                      [--key-directory <file>]',
 ];
 
 /**
@@ -97,7 +100,54 @@ function parseArguments(argv) {
   if (command === 'keygen') return parseKeygen(rest);
   if (command === 'check') return parseCheck(rest);
   if (command === 'keys') return parseKeys(rest);
+  if (command === 'cite') return parseCite(rest);
   return null;
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {Record<string, any> | null}
+ */
+function parseCite(rest) {
+  /** @type {Record<string, any>} */
+  const parsed = { command: 'cite', json: false };
+  let file = null;
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const argument = rest[index];
+    if (argument === '--json') {
+      parsed.json = true;
+    } else if (argument === '--title' || argument === '--index' || argument === '--key-directory') {
+      const value = nextValue(rest, index, argument);
+      if (value === null) return null;
+      if (argument === '--key-directory') {
+        try {
+          parsed.keyDirectory = readDirectoryFile(value);
+        } catch (error) {
+          console.error(`${value}: could not be read as a key directory: ${error.message}`);
+          return null;
+        }
+      } else {
+        parsed[flagName(argument)] = value;
+      }
+      index += 1;
+    } else if (argument.startsWith('--')) {
+      console.error(`unknown option: ${argument}`);
+      return null;
+    } else if (file === null) {
+      file = argument;
+    } else {
+      console.error(`unexpected argument: ${argument}`);
+      return null;
+    }
+  }
+
+  if (file === null) {
+    console.error('cite needs the receipt to cite');
+    return null;
+  }
+  parsed.file = file;
+  return parsed;
 }
 
 /**
@@ -772,6 +822,66 @@ function listKeys(file) {
   return 0;
 }
 
+/**
+ * Write down what a receipt supports, in a form other tools already read.
+ *
+ * The receipt is verified first, and that is not ceremony: a citation is an invitation to trust something,
+ * and handing somebody one built from a receipt that did not verify here - without saying so - would be the
+ * exact failure this project exists to avoid. A failed receipt is still citable, because the citer may know
+ * something this verifier does not; it is citable *and* labelled.
+ *
+ * @param {Record<string, any>} options
+ * @returns {Promise<number>}
+ */
+async function citeReceipt(options) {
+  let verdict;
+  try {
+    verdict = await verifyReceipt(
+      read(options.file),
+      options.keyDirectory === undefined ? {} : { keyDirectory: options.keyDirectory },
+    );
+  } catch (error) {
+    console.error(`${options.file}: could not be read: ${error.message}`);
+    return 2;
+  }
+
+  if (verdict.subject.url === null) {
+    console.error(`${options.file}: the claim names no URL, so there is nothing to cite`);
+    return 2;
+  }
+
+  const citation = citationFor({
+    url: verdict.subject.url,
+    capturedAt: verdict.subject.captured_at,
+    claimHash: verdict.receipt.claim_hash,
+    title: options.title ?? null,
+    receiptName: options.file,
+  });
+
+  if (options.json) {
+    console.log(JSON.stringify(citation.csl, null, 2));
+  } else {
+    console.log(citation.text);
+    if (citation.trailer !== '') {
+      console.log('');
+      console.log(`  commit trailer  ${citation.trailer}`);
+    }
+    for (const caveat of citation.caveats) console.log(`  note            ${caveat}`);
+    if (!verdict.verified) {
+      console.log('');
+      console.log('This receipt did not verify here, so the citation above refers to a claim this machine');
+      console.log('could not confirm. Say that where you use the citation, or check it somewhere it does.');
+    }
+  }
+
+  if (options.index !== undefined) {
+    appendFileSync(options.index, `${indexEntry(citation.csl, options.file)}\n`);
+    if (!options.json) console.log(`appended a line to ${options.index}`);
+  }
+
+  return exitCode(verdict);
+}
+
 const parsed = parseArguments(process.argv.slice(2));
 if (parsed === null) {
   for (const line of USAGE) console.error(line);
@@ -784,6 +894,8 @@ if (parsed === null) {
   process.exitCode = await checkAgainstPage(parsed);
 } else if (parsed.command === 'keys') {
   process.exitCode = listKeys(parsed.file);
+} else if (parsed.command === 'cite') {
+  process.exitCode = await citeReceipt(parsed);
 } else if (parsed.command === 'keygen') {
   process.exitCode = keygen(parsed);
 } else {

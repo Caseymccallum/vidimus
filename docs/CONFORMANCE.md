@@ -26,7 +26,7 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 139 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
+| `npm test` | 144 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. `--trusted-key` and `--key-directory` are how a caller answers "whose key is this?" (section 6.7 of the specification). |
@@ -106,7 +106,8 @@ Named here, with what each would take, so that none of them is mistaken for a de
 | **Level 3 (currency)** | L3 verifies the claim's own fingerprint; nothing compares a receipt with the live page | The comparison is specified (section 7.7 of the specification) and implemented as `vidimus check`: it verifies the receipt, fetches the URL, seals a second receipt for what the page says now, and prints a report with five outcomes - including "the bytes changed and the words did not". It never touches `verified`, and `--require-same-words` opts in to letting the comparison decide an exit code. |
 | **Size limits** | `container.readable` accepts any declared entry size | A cap applied before inflating, and a status for a receipt that exceeds it. Recorded as a limitation in the specification and the threat model so that it is not mistaken for a design choice. |
 | **A second implementation** | Section 11's conformance list | Another language reading the same vectors. Until then the vectors pin one implementation's answers, which is agreement rather than corroboration, and the threat model says as much. |
-| **ZIP64, encrypted entries and unknown methods, in a browser** | `container.readable: unsupported` | The browser's reader handles stored and deflated entries. Everything else it refuses by name: ZIP64 and multi-disk archives because a browser cannot inflate across them, encryption because no browser API reads it. The command line has the same limits, and says so in its own message. |
+| **Attaching a receipt to what it supports** | `subject.url` is a claim field; a citation built from a receipt is a *new* file | `vidimus cite` emits CSL-JSON, a plain sentence and a commit trailer built from what the claim asserts - a URL, an access date and the claim hash as the identifier. A title is the citer's to supply (`--title`), because a receipt never asserts one. Embedding a receipt in a PDF in the shape PAdES uses is **not** implemented: it needs a CMS `SignedData` over a PDF byte range and an incremental update, and an attachment that no viewer can verify would be worse than a sidecar. |
+
 
 ## 7. Adding a check
 

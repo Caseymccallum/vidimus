@@ -517,6 +517,37 @@ Three refusals in the design are worth recording, because each is the tempting a
 **A caller's mistake is a caveat, not damage.** A directory that cannot be read leaves `key_trusted` where
 it was and adds a line saying why: mistyping a path must not make somebody's receipt look worse.
 
+### D-028 - A citation is built from what the claim asserts, and adds nothing to it
+
+A receipt is evidence, and evidence travels with a reference to the work it supports. So `vidimus cite`
+writes one - in CSL-JSON, which citation managers already read, rather than in a format invented here - plus
+a plain sentence and a `Receipt:` line for a commit message.
+
+The decision worth recording is what the citation *does not* contain. A claim asserts a URL, a capture time,
+a document digest and the words on the page. It does **not** assert a title, an author or a publication
+date: those are facts about a work, and a capture of a page is not a claim about one. So the citation
+carries a URL, an access date and the claim hash as its identifier, and a title only when the person citing
+supplies one (`--title`). Inventing a title from, say, the first line of the text fingerprint would be the
+plausible falsehood this project refuses inside a signed claim, and a bibliography is no place to start
+writing them.
+
+Three smaller decisions:
+
+1. **The identifier is the claim hash.** It is what makes a citation checkable: somebody holding the receipt
+   recomputes it, and somebody holding the citation can search an index by it.
+2. **`--index` appends one JSON line.** A repository that cites pages needs a list of what it cites, and a
+   file of receipts nobody can search is not a list. The line records the receipt's path, so the index
+   points at the evidence rather than duplicating it.
+3. **A receipt that did not verify is still citable, and says so.** The citer may know something this
+   machine does not; what must not happen is a citation that looks confirmed when it was not, so the
+   command prints the warning beside it and exits non-zero.
+
+**Rejected:** a PDF attachment in the shape PAdES uses, for now. It needs a CMS `SignedData` over the
+document's byte range and an incremental update, neither of which exists here - and an "attachment" that no
+viewer can verify would look like evidence while being a file next to a document. Named in section 13 of the
+specification with what it would take, and the sidecar pattern (a `.receipt` beside the file, an index line
+in the repository) covers the need honestly in the meantime.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

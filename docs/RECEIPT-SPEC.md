@@ -869,9 +869,14 @@ Written down now, with the reason each is deferred:
 5. **Key directories.** A `.well-known` document, or simply a `receipt-keys.json`. Deliberately
    absent until there is a second implementer to disagree with about it.
 6. **A claim that spans several URLs** - a bibliography, or a page plus the sources it cites.
-7. **Attaching a receipt to the thing it supports**: a PDF (in the shape PAdES uses), a citation
-   manager entry, a git commit. This is where the format meets its users, and it is out of scope
-   only because 0.1 has to be checkable first.
+7. **Attaching a receipt to the thing it supports**: a citation manager entry and a commit trailer are done
+   (`vidimus cite`, section 6.7 does not cover this - see `docs/ARCHITECTURE.md` D-028), and the two that
+   remain are named with what each would take. **A PDF**, in the shape PAdES uses: a CMS `SignedData` over
+   the document's byte range, written into an incremental update, with the receipt as an embedded file.
+   That is real work and the alternative is worse - an attachment no viewer can verify looks like evidence
+   and is not. **A `.well-known` directory fetch**: a key directory reached over the network is one an
+   attacker can replace, so fetching it stays a caller's deliberate act rather than something a verifier
+   does on its own (section 6.7).
 8. **Filling in the profiles.** `document-v1` is defined and produced (section 4.4); a *wire* profile
    needs a name and something that can write one, which means a crawler rather than a browser extension.
    Naming it before anything can produce it would be a name with no meaning.

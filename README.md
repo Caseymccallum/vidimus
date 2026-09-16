@@ -9,7 +9,7 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-139-3DA639)](#verify-the-claims-yourself)
+[![Tests](https://img.shields.io/badge/tests-144-3DA639)](#verify-the-claims-yourself)
 [![Vectors](https://img.shields.io/badge/vectors-38-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
@@ -52,7 +52,7 @@ both facts true, both reported, neither hidden behind the other.
 > detect. [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) is the full list, ordered by how easy each
 > one is to misread.
 
-> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 139 tests,
+> **⚠️ Early, and deliberately so.** 0.1.0 is the specification and a reference verifier: 144 tests,
 > 38 conformance vectors, no dependencies. The extension that will make a receipt in one click is the
 > next piece of work. The format had to be checkable before anything wrote it at scale.
 
@@ -218,6 +218,36 @@ here because a format that cannot say what it grew out of is a format nobody can
   verifier deliberately has none.
 - **Key directories** - who a key belongs to. Deliberately absent until there is a second
   implementation to disagree with about it.
+
+## Citing it
+
+A receipt is evidence, so it should travel with the reference it supports. Three ways, in rising order of
+ceremony:
+
+```bash
+vidimus cite page.receipt --title 'The title you give it'   # a CSL-JSON entry, and a sentence
+vidimus cite page.receipt --index citations.jsonl           # one line, in a file you commit
+vidimus cite page.receipt --json                            # paste into a citation manager
+```
+
+The citation carries a URL, an access date and the claim hash as its identifier, and **a title only if you
+supply one**: a receipt asserts what a page said, never what it is called, and a bibliography is not a place
+to start guessing. `--index` appends one JSON line per receipt - a list of what a repository cites, pointing
+at the receipts rather than copying them - and the line printed under the citation is the trailer a commit
+message can carry:
+
+```
+Receipt: fbf9d6d777b5cf25882e7465ccbec1cbf73425f3f203ec0016843eba66b7960a
+```
+
+Keep the `.receipt` file beside the work it supports. That sidecar arrangement is what makes a citation
+checkable years later: the hash in the citation finds the file, the file verifies, and `vidimus check` - if
+you choose to run it - compares it with the page as it is then.
+
+**Not here yet:** embedding a receipt in a PDF the way PAdES embeds a signature. It needs a CMS
+`SignedData` over the document's byte range and an incremental update, and an attachment no viewer can
+verify would look like evidence while being a file next to a document (D-028, and section 13 of the
+specification).
 
 ## Read next
 
