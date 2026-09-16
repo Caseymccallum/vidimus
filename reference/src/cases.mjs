@@ -24,6 +24,30 @@ import { canonicalJson, buildReceipt, prettyJson, signer, stranger } from './fix
 import { sha256, toBase64Url, utf8 } from './digest.mjs';
 import { textDigest } from './text.mjs';
 import { buildWarcRecord } from './capture.mjs';
+
+/**
+ * A WACZ holding one WARC record written by hand.
+ *
+ * The fixture builders always produce well-formed records, which is what makes them useful - and what makes
+ * them useless for the cases whose point is a record they would never have produced. This wraps one of those.
+ *
+ * @param {Uint8Array} record
+ * @param {string} [path]
+ * @returns {Uint8Array}
+ */
+function waczOfRecord(record, path = 'archive/data.warc') {
+  const dataPackage = canonicalise({
+    profile: 'data-package',
+    wacz_version: '1.1.1',
+    resources: [{
+      name: path.split('/').pop(),
+      path,
+      hash: `sha256:${sha256(record)}`,
+      bytes: record.length,
+    }],
+  });
+  return waczBytes([['datapackage.json', utf8(dataPackage)], [path, record]]);
+}
 import { TSA_GEN_TIME, tsaCertificate, timestampToken } from './tst-fixture.mjs';
 import { FIXTURE_DATE, waczBytes, waczEntries, DEFAULT_HTML, DEFAULT_URL, SPEC_VERSION } from './fixtures.mjs';
 import { writeZip } from './zip.mjs';
@@ -596,6 +620,86 @@ export const CASES = [
       exit_code: 2,
       levels: { L0: 'pass', L1: 'pass', L2: 'fail', L3: 'not_applicable' },
       checks: { 'anchor.verified': 'fail' },
+    },
+  },
+  {
+    id: 'document-request-has-no-http-block',
+    description: 'a response record whose payload is not an HTTP response at all',
+    proves: 'the record layer answers one question - what did the server send - so a record with no HTTP header block is not_checked rather than a document extracted from whatever bytes happened to be there',
+    build: () => {
+      const record = utf8([
+        'WARC/1.0',
+        'WARC-Type: response',
+        `WARC-Target-URI: ${DEFAULT_URL}`,
+        `WARC-Date: ${FIXTURE_DATE}`,
+        'Content-Type: application/http; msgtype=response',
+        '',
+        '<html><body>a body with no response line in front of it</body></html>',
+        '',
+      ].join('\r\n'));
+      return buildReceipt({ wacz: waczOfRecord(record) }).bytes;
+    },
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'not_checked' },
+    },
+  },
+  {
+    id: 'document-truncated-by-its-own-content-length',
+    description: 'a response whose Content-Length is longer than the record holds',
+    proves: 'section 9: a stated length longer than the record holds is a truncated capture, refused rather than hashed in part - a digest over the half of a document that survived would describe something nobody ever sent',
+    build: () => {
+      const record = utf8([
+        'WARC/1.0',
+        'WARC-Type: response',
+        `WARC-Target-URI: ${DEFAULT_URL}`,
+        `WARC-Date: ${FIXTURE_DATE}`,
+        'Content-Type: application/http; msgtype=response',
+        '',
+        'HTTP/1.1 200 OK',
+        'Content-Type: text/html; charset=utf-8',
+        'Content-Length: 99999',
+        '',
+        '<html><body>only part of this survived</body></html>',
+        '',
+      ].join('\r\n'));
+      return buildReceipt({ wacz: waczOfRecord(record) }).bytes;
+    },
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'not_checked' },
+    },
+  },
+  {
+    id: 'document-content-length-is-not-a-number',
+    description: 'a response that states a Content-Length no reader can act on',
+    proves: 'a header the reader cannot parse is refused by name rather than ignored: ignoring it would mean hashing whatever came next, which is the one thing a document digest must never be a guess about',
+    build: () => {
+      const record = utf8([
+        'WARC/1.0',
+        'WARC-Type: response',
+        `WARC-Target-URI: ${DEFAULT_URL}`,
+        `WARC-Date: ${FIXTURE_DATE}`,
+        'Content-Type: application/http; msgtype=response',
+        '',
+        'HTTP/1.1 200 OK',
+        'Content-Type: text/html; charset=utf-8',
+        'Content-Length: many',
+        '',
+        '<html><body>a length that is not a length</body></html>',
+        '',
+      ].join('\r\n'));
+      return buildReceipt({ wacz: waczOfRecord(record) }).bytes;
+    },
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'subject.document': 'not_checked' },
     },
   },
   {

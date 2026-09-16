@@ -1499,6 +1499,150 @@
       }
     },
     {
+      "id": "document-request-has-no-http-block",
+      "description": "a response record whose payload is not an HTTP response at all",
+      "proves": "the record layer answers one question - what did the server send - so a record with no HTTP header block is not_checked rather than a document extracted from whatever bytes happened to be there",
+      "fixture": {
+        "file": "document-request-has-no-http-block.receipt",
+        "sha256": "73d11a1d36df1d9f947f7e4de3c99ffce4cfb6d9e12fd0e42440ffd830eac1fb",
+        "bytes": 1853
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "0c198797f9922e35c4af0aec343762dc1768a4b4275abdbe918f227a024c843e",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "document-truncated-by-its-own-content-length",
+      "description": "a response whose Content-Length is longer than the record holds",
+      "proves": "section 9: a stated length longer than the record holds is a truncated capture, refused rather than hashed in part - a digest over the half of a document that survived would describe something nobody ever sent",
+      "fixture": {
+        "file": "document-truncated-by-its-own-content-length.receipt",
+        "sha256": "8f2f4700515c269d273c7c8dd8784b2739f6abb3973ec617b4a00d70d37af36e",
+        "bytes": 1918
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "2a302e3a8b27b0523756a951606b5bedc47ae8ea75987cf64ae60ae59ca5430b",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
+      "id": "document-content-length-is-not-a-number",
+      "description": "a response that states a Content-Length no reader can act on",
+      "proves": "a header the reader cannot parse is refused by name rather than ignored: ignoring it would mean hashing whatever came next, which is the one thing a document digest must never be a guess about",
+      "fixture": {
+        "file": "document-content-length-is-not-a-number.receipt",
+        "sha256": "9e269941bf345f55303101da582987cac63edf32afaf3ba1b2d4c362804a0c3e",
+        "bytes": 1920
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "subject.document": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "6a0decff05215ddaadc75441be35d11a21a7755b9e7ebf90bb6073a5e134488c",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 2,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
       "id": "text-fingerprint-with-no-readable-document",
       "description": "a claim that declares a text fingerprint and a capture whose page cannot be found",
       "proves": "a fingerprint is only checkable against a document, so when there is no document the check is not_checked - never a failure, because the claim may be perfectly honest and the capture simply not one this reader can open",

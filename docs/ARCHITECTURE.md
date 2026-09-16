@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 58 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 61 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -750,7 +750,7 @@ Three decisions about how it was done, which matter more than what it covered:
 3. **It reports what it did not reach, by name.** Three vectors are refused outright (a float, a `-0`, a
    version this implementation does not read), and the checks a stopped stage never reached are filled in as
    `not_checked` rather than omitted - so every fixture has a status for every check, and the refusals are
-   counted and listed separately from the 55 that agree, because a conformance report that says "no
+   counted and listed separately from the 58 that agree, because a conformance report that says "no
    disagreement" without saying what it never looked at is the exact failure mode this project is arranged
    against.
 
