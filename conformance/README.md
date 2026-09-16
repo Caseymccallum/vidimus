@@ -58,7 +58,7 @@ python conformance/verify_claims.py ./kit          # exit 0 when nothing disagre
 ## The result
 
 ```
-claim hashes: 45 of 50 fixtures agree
+claim hashes: 45 of 52 fixtures agree
 3 refused, and the record says the same (a corroborated refusal, not a pass by silence)
 0 disagree
 ```
@@ -72,7 +72,7 @@ words extracted from the capture's document by the seven rules of section 4.5.1 
 refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not read),
 and the record agrees that they are refused.
 
-Every status each check can produce is exercised across those 50 fixtures: all four of `anchor.verified`
+Every status each check can produce is exercised across those 52 fixtures: all four of `anchor.verified`
 (`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, the `pass` and `fail` of the
 text fingerprint and its `not_applicable` when a claim carries none, and both the refusals and the stage gaps
 of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
@@ -90,10 +90,10 @@ a key as unvouched-for when the caller vouched for it. That is now implemented, 
 
 ## What writing it found
 
-Nine things that only showed up when somebody implemented the format somewhere else. Six are fixed in the
-specification; the rest are named as open, because a list that reads as if it were closed is worse than no
-list at all. Each of the fixed ones was fixed *after* a second implementation got it wrong - which is the only
-argument for a rule that a reader cannot talk back to.
+Nine things that only showed up when somebody implemented the format somewhere else. All nine are now closed:
+six by changing the specification, which is the outcome this directory exists to produce, and three by changing
+this implementation - one of which was a claim with no `tool` block in it that verified as `true`. Every one was
+found by a fixture rather than by reading, which is the argument the rest of this file makes.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
    through `JSON.parse`, so the reference rejects it there; Python's `json` returns `0`, and the sign is gone
@@ -133,7 +133,7 @@ argument for a rule that a reader cannot talk back to.
    the key usage, the validity window - checking out. The vectors caught it in one run, and an implementer with
    no vectors would have concluded the TSA was lying. **Now stated** in section 8.3.
 
-Nine findings, eight of them closed by changing the specification rather than the code:
+Nine findings, six of them closed by changing the specification rather than the code:
 
 | Finding | Now stated in |
 | --- | --- |
@@ -144,14 +144,17 @@ Nine findings, eight of them closed by changing the specification rather than th
 | 6. What a timestamp token's signature actually covers | Section 8.3: the attributes re-tagged as a `SET OF`, length octets and all |
 | 7. Whitespace, named references and decoding in `text-v1` | Section 4.5.1 rules 5 and 6, and section 4.5.2 (D-035) |
 
-**All nine are now closed**, and the last one closed differently from the other eight. #8 - the stage structure,
-and the four rules about *when* a check runs - is now section 7.3.1, which is the part of the specification I
-would have said was already covered before a second implementation read it. #3 is the other kind of finding and
-was never a missing rule: the check table has said "carries a signature with the required fields" from the
-first draft, and this implementation read the check's *name* instead of the sentence, passed a claim whose
-signature had no `sig` in it, and reported three wrong statuses. Same failure as the entity list in D-035 - a
-rule that looks stated until somebody follows it - and why this directory runs against the vectors rather than
-against its own understanding of the prose.
+**All nine are now closed**, and two of them were never missing rules at all. #8 - the stage structure, and the
+four rules about *when* a check runs - is now section 7.3.1, which is the part of the specification I would
+have said was already covered before a second implementation read it. #3 and #9 are the other kind: the check
+table has said "carries a signature with the required fields" from the first draft, and section 4.1 has said
+which fields a claim must have, and this implementation read the first check's *name* instead of its sentence
+and did not implement the second at all. Neither would have been caught by reading the prose more carefully -
+the second only by a fixture that takes a required field out of a claim.
+
+That is the argument for keeping the vector set ahead of the prose, and for adding a fixture every time a rule
+turns out to have none. Four times now, a fixture written for something already implemented has found a real
+fault - and twice the fault was in this directory's documentation rather than in its code.
 
 7. **`text-v1` left three things to the reader, and it now does not.** Section 4.5.1 was otherwise a model of
    how to write an extraction down - seven rules, a named element list, a stated degradation for malformed
@@ -180,14 +183,23 @@ picture. Both were reported by the kit as disagreements, and both were this impl
    `manifest.canonical: fail` **and carries on** — the claim hash comes from the parsed value, not from the
    delivered bytes — while a claim with *no* canonical form at all stops. Two ways to fail, two different
    consequences, and `claim-not-canonical` and `claim-contains-a-float` are the two vectors that tell them
-   apart.
+   apart. **Now stated** as section 7.3.1.
+
+9. **`manifest.shape` was not implemented at all, and a claim with no `tool` block verified as `true`.** This
+   one is not a gap in the specification: section 4.1's table says which fields are required, section 7.4's row
+   says "required fields are present and correctly typed", and section 12 says what an entry name may be. This
+   implementation checked the entry name and nothing else, so a claim that had been canonically rewritten
+   without its `tool` went through every check and came out verified. **Eleven fields** disagreed with the
+   record on the first run - `manifest.shape`, seven capture checks, `subject.document`, `verified`,
+   `exit_code` and L0. The two vectors are `manifest-missing-a-required-field` and
+   `capture-path-is-a-stream-name`.
 
 And one thing the specification got *right*, which is worth recording in a document that is otherwise a list
 of what it got wrong. Section 8.1 requires an anchorless claim to report `anchor.present: not_applicable` and
 `anchor.verified: not_checked` - an asymmetry that looks like a mistake until the reason is read ("there is
 nothing here to have a type" against "there was nothing to verify, and this receipt does not have a verified
 time"). It is stated, it is complete, and implementing it from the text alone reproduced all four statuses that
-check can produce, across 50 fixtures - including the `unsupported` an unknown type gets, which is the rule a
+check can produce, across 52 fixtures - including the `unsupported` an unknown type gets, which is the rule a
 naive implementation would get wrong by calling it a failure. Section 8 is the part of this specification a
 second implementer can follow without asking anybody anything.
 
@@ -201,7 +213,7 @@ Section 11 lists four conditions, and this implementation meets them:
    reached filled in as `not_checked` rather than omitted;
 2. **the status, level-rollup and `verified` rules of sections 7.1-7.5** - derived independently and compared,
    and agreeing;
-3. **the canonical form, byte for byte, including the refusals** - 47 of 50 fixtures agree, and the three
+3. **the canonical form, byte for byte, including the refusals** - 47 of 52 fixtures agree, and the three
    refusals are corroborated as refusals rather than passed over in silence;
 4. **the recorded verdicts** - comparing every rule-derived field, and agreeing on all nine distinct
    combinations of `attribution`, `time_bound` and `capture_profile` the fixtures contain.

@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 50 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 52 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -750,7 +750,7 @@ Three decisions about how it was done, which matter more than what it covered:
 3. **It reports what it did not reach, by name.** Three vectors are refused outright (a float, a `-0`, a
    version this implementation does not read), and the checks a stopped stage never reached are filled in as
    `not_checked` rather than omitted - so every fixture has a status for every check, and the refusals are
-   counted and listed separately from the 47 that agree, because a conformance report that says "no
+   counted and listed separately from the 49 that agree, because a conformance report that says "no
    disagreement" without saying what it never looked at is the exact failure mode this project is arranged
    against.
 
@@ -785,6 +785,15 @@ delegates WARC semantics to ISO 28500, and says nothing about where a record end
 `Content-Length` means, or whether a record's own `WARC-Payload-Digest` is checked. It was written with the
 reference in view, so it corroborates the reference's *behaviour* rather than the specification's *text* - a
 weaker claim, and `conformance/README.md` says so where the result is stated rather than in a footnote.
+
+**The worst fault the exercise found was in this implementation, in a rule that was already stated.** Section
+4.1 says which fields a claim must have, section 7.4's row says the shape check verifies them, and section 12
+says what an entry name may be - and this implementation checked the entry name and nothing else. A claim with
+its `tool` block deleted, canonically rewritten so that every other check passed, reported `verified: true`,
+`exit_code: 0` and L0 `pass`. Eleven fields disagreed with the record the moment a fixture took a required field
+out. A verifier that reports a malformed receipt as verified is precisely the failure this project exists to
+prevent, and it survived nine fixes to the specification because no fixture had ever exercised the check that
+decides whether a document is a claim at all.
 
 ### D-036 - A caveat count is recorded, not asked for
 

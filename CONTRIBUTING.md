@@ -12,11 +12,11 @@ worth more than any amount of additional code.
    [`spec/vectors/receipt-vectors.json`](spec/vectors/receipt-vectors.json) would turn "the reference
    implementation agrees with itself" into corroboration. It has been started:
    [`conformance/verify_claims.py`](conformance/verify_claims.py) covers the canonical form, the claim hash
-   and the signature family - 17 of the 21 checks - and agrees with the record on 39 of 50 fixtures. The
+   and the signature family - 17 of the 21 checks - and agrees with the record on 39 of 52 fixtures. The
    fixtures ship for extending it, so nobody starts by reimplementing anybody's fixture builder:
 
    ```bash
-   node reference/src/vectors.mjs --emit ./kit   # 50 fixtures, the answers, and what to do with them
+   node reference/src/vectors.mjs --emit ./kit   # 52 fixtures, the answers, and what to do with them
    python conformance/verify_claims.py ./kit     # the second implementation, against them
    ```
 

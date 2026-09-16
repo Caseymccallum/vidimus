@@ -598,6 +598,45 @@ export const CASES = [
     },
   },
   {
+    id: 'capture-path-is-a-stream-name',
+    description: 'a claim whose capture entry name carries a colon',
+    proves: 'section 12: a colon is a drive letter or an NTFS alternate data stream on Windows and has no business in a receipt, so the name is refused at the shape check even though it resolves nowhere near the filesystem on the machine checking it',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        manifest.capture.path = 'archive/data.warc.gz:stream';
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: {
+        'manifest.shape': 'fail',
+        'capture.present': 'not_checked',
+      },
+    },
+  },
+  {
+    id: 'manifest-missing-a-required-field',
+    description: 'a claim that has been canonically rewritten without its tool block',
+    proves: 'manifest.shape is about the claim being a claim at all: a required field that is absent stops the capture stage before anything is looked up with the claim\'s names, and the signature is still checked - a malformed receipt and a forged one are different sentences',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        delete manifest.tool;
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'pass', L2: 'not_checked', L3: 'not_applicable' },
+      checks: {
+        'manifest.shape': 'fail',
+        'capture.present': 'not_checked',
+        'subject.document': 'not_checked',
+      },
+    },
+  },
+  {
     id: 'anchor-rfc3161-not-a-timestamping-certificate',
     description: 'a token signed by a pinned certificate that is not a timestamping one',
     proves: 'section 8.3 step 1, second half: a pin is not a licence to skip the protocol - RFC 3161 requires the timeStamping extended key usage, so a pinned certificate without it is a failure rather than an untested pass',

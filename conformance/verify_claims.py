@@ -37,6 +37,7 @@ import sys
 import zipfile
 from base64 import urlsafe_b64decode
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import ed25519
 import container
@@ -204,6 +205,117 @@ def parse_manifest(raw: bytes) -> dict:
         raise NotCanonical("`%s` is not a JSON value, and is not canonical here" % constant)
 
     return json.loads(text, parse_constant=refuse)
+
+
+# The shapes a claim's fields must have (section 4.1's required column, and the optional fields' types).
+HEX_64 = re.compile(r"^[0-9a-f]{64}$")
+SEMANTIC_VERSION = re.compile(r"^\d+\.\d+\.\d+$")
+UTC_SECOND = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+def shape_problems(manifest: dict) -> list[str]:
+    """`manifest.shape`: required fields present and correctly typed, and entry names confined (section 12).
+
+    Returns problems rather than a status, because a verdict carries statuses and not reasons - but the
+    runner prints them, and "the claim has no tool block" is a more useful sentence than "the shape is wrong".
+
+    This is the check that decides whether a document is a claim at all, and it was missing from this
+    implementation until a fixture took the `tool` block out of one: without it, a malformed receipt verified
+    as `true`, which is the failure mode the whole project is arranged against.
+    """
+    problems: list[str] = []
+
+    if not isinstance(manifest.get("spec_version"), str) or SEMANTIC_VERSION.match(manifest["spec_version"]) is None:
+        problems.append('spec_version must be a semantic version such as "0.1.0"')
+    if manifest.get("canonical_form") != "canonical-json-v1":
+        problems.append('canonical_form must be "canonical-json-v1"')
+
+    capture = manifest.get("capture")
+    if not isinstance(capture, dict):
+        problems.append("capture must be an object")
+    else:
+        if not container.is_safe_entry_name(capture.get("path")):
+            problems.append("capture.path must be a relative entry name inside the receipt (section 12)")
+        if not isinstance(capture.get("media_type"), str) or capture["media_type"] == "":
+            problems.append("capture.media_type must be a non-empty string")
+        problems += _hex_problem(capture.get("sha256"), "capture.sha256")
+        problems += _count_problem(capture.get("bytes"), "capture.bytes")
+        if not isinstance(capture.get("captured_at"), str) or UTC_SECOND.match(capture["captured_at"]) is None:
+            problems.append("capture.captured_at must be a UTC timestamp to the second")
+        if "profile" in capture and (not isinstance(capture["profile"], str) or capture["profile"] == ""):
+            problems.append("capture.profile must be a non-empty string when present")
+
+    subject = manifest.get("subject")
+    if not isinstance(subject, dict):
+        problems.append("subject must be an object")
+    else:
+        problems += _url_problem(subject.get("url"), "subject.url", required=True)
+        if "final_url" in subject:
+            problems += _url_problem(subject.get("final_url"), "subject.final_url", required=True)
+        for optional in ("status",):
+            if optional in subject and not _is_count(subject[optional]):
+                problems.append("subject.%s must be an integer when present" % optional)
+        if "content_type" in subject and not isinstance(subject.get("content_type"), str):
+            problems.append("subject.content_type must be a string when present")
+
+        document = subject.get("document")
+        if not isinstance(document, dict):
+            problems.append("subject.document must be an object")
+        else:
+            problems += _hex_problem(document.get("sha256"), "subject.document.sha256")
+            problems += _count_problem(document.get("bytes"), "subject.document.bytes")
+
+        if "text" in subject:
+            fingerprint = subject.get("text")
+            if not isinstance(fingerprint, dict):
+                problems.append("subject.text must be an object when present")
+            else:
+                if not isinstance(fingerprint.get("normalization"), str):
+                    problems.append("subject.text.normalization must be a string")
+                problems += _hex_problem(fingerprint.get("sha256"), "subject.text.sha256")
+
+    tool = manifest.get("tool")
+    if not isinstance(tool, dict):
+        problems.append("tool must be an object")
+    else:
+        for field in ("name", "version"):
+            if not isinstance(tool.get(field), str) or tool[field] == "":
+                problems.append("tool.%s must be a non-empty string" % field)
+
+    if manifest.get("signature") is not None and not isinstance(manifest.get("signature"), dict):
+        problems.append("signature must be an object or null")
+    if not isinstance(manifest.get("anchor"), dict):
+        problems.append("anchor must be an object")
+
+    return problems
+
+
+def _is_count(value) -> bool:
+    """An integer of the kind the claim admits: a whole number, not a negative, and not a boolean."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _hex_problem(value, label: str) -> list[str]:
+    if not isinstance(value, str) or HEX_64.match(value) is None:
+        return ["%s must be 64 lowercase hex characters" % label]
+    return []
+
+
+def _count_problem(value, label: str) -> list[str]:
+    if not _is_count(value):
+        return ["%s must be a non-negative integer" % label]
+    return []
+
+
+def _url_problem(value, label: str, required: bool) -> list[str]:
+    if value is None and not required:
+        return []
+    if not isinstance(value, str):
+        return ["%s must be a string" % label]
+    parts = urlsplit(value)
+    if parts.scheme not in ("http", "https") or parts.netloc == "":
+        return ["%s must be an absolute http or https URL" % label]
+    return []
 
 
 def document_status(inner: dict[str, bytes] | None, manifest: dict) -> tuple[str, str | None]:
@@ -533,19 +645,25 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     # 4. The shape, the capture, the document it holds, then the attribution checks. A claim that failed the
     #    canonical form still gets its capture checked - only a *shape* failure stops the capture stage - and
     #    the signature never depended on the claim being sound at all.
-    capture = manifest.get("capture")
-    capture_bytes = (
-        entries.get(capture["path"])
-        if isinstance(capture, dict) and isinstance(capture.get("path"), str)
-        else None
-    )
-    inner = container.wacz_entries(capture_bytes)
-    statuses.update({
-        key: value for key, value in container.container_statuses(entries, manifest, inner).items()
-        if key != "container.readable"
-    })
-    statuses["subject.document"] = document_status(inner, manifest)[0]
-    return finish(statuses, derived, inner)
+    shape = shape_problems(manifest)
+    inner = None
+    if shape:
+        # The names in this claim are not ones to look anything up by, so nothing is.
+        statuses["manifest.shape"] = "fail"
+    else:
+        capture = manifest.get("capture")
+        capture_bytes = (
+            entries.get(capture["path"])
+            if isinstance(capture, dict) and isinstance(capture.get("path"), str)
+            else None
+        )
+        inner = container.wacz_entries(capture_bytes)
+        statuses.update({
+            key: value for key, value in container.container_statuses(entries, manifest, inner).items()
+            if key != "container.readable"
+        })
+        statuses["subject.document"] = document_status(inner, manifest)[0]
+    return finish(statuses, derived, inner if not shape else None)
 
 
 def _outcome(statuses: dict, checks: dict) -> str:
