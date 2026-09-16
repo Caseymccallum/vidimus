@@ -98,14 +98,14 @@ argument for a rule that a reader cannot talk back to.
    `signature-shape-broken`. The kit caught it on the first run, which is the whole argument for recording
    statuses rather than prose: an implementer can disagree with every sentence in the specification and still
    be told, precisely, which check they got wrong.
-4. **The WARC-reading rules are not in the specification.** Section 9 says a verifier reads *"the response
+4. **The WARC-reading rules were not in the specification.** Section 9 says a verifier reads *"the response
    record for `subject.url` and the body after its HTTP headers, and nothing else"*. That sentence does not
    say where one record ends and another begins (the reference searches for the seven bytes `WARC/1.0`
    anywhere in the inflated stream, so a payload containing them would split a record in two); whether an
    HTTP `Content-Length` is trusted and what a *longer* one means (a truncated capture, refused); or whether
    the record's own `WARC-Payload-Digest` is checked (it is, and a mismatch stops the read). A second
    implementer has to read another implementation to find any of that out, which is the one thing this
-   project is arranged against.
+   project is arranged against. **Now stated** in section 9, beside the check that depends on it.
 
 5. **The safe-entry-name rule is only in code.** Section 12 states the principle (*"no absolute paths, no
    `..`, no backslashes, no drive letters"*) and the enumeration — the length cap, the refusal of `//`, of a
