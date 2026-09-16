@@ -479,6 +479,59 @@ the truth; that the capture is complete; that the claim hash was computed correc
 anything happened at the time the claim says. Those are the jobs of key directories (which are
 outside this specification), of the anchor (section 8), and of the verifier's judgement.
 
+### 6.7 Key directories: who a key belongs to
+
+A `signature.signer` field is a claim, not a fact: it is inside the signature, which proves that the key
+said it, not that it is true. What a verifier establishes on its own is narrower and still useful - *this
+key signed this claim*, identified by a derived key id - and the remaining question, *whose key is it?*,
+belongs to the verifier's caller. This section defines the document that answers it.
+
+A **key directory** is JSON:
+
+```json
+{
+  "kind": "receipt-key-directory",
+  "spec_version": "0.1.0",
+  "name": "Example Org records",
+  "keys": [
+    {
+      "key_id": "…64 hex…",
+      "public_key": "…base64url raw ed25519…",
+      "name": "Example Org",
+      "email": "records@example.org",
+      "note": "records desk",
+      "valid_from": "2026-01-01T00:00:00Z",
+      "valid_until": "2027-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+1. **A directory is trusted because it was chosen, not because it is signed.** No signature is defined for
+   one, deliberately: a signed directory moves the question one step back (*who signed the signature on
+   it?*), and a directory fetched over the network is one an attacker can replace. How a caller obtains one
+   is outside this format.
+2. **`key_id` MUST equal the SHA-256 of `public_key`** - the same derived-never-asserted rule as everywhere
+   else. An entry that disagrees with itself is refused rather than resolved, the verifier says so in a
+   caveat, and that entry is treated as absent.
+3. **No two entries may share a `key_id`.** A directory that says two things about one key is not one.
+4. **`valid_from` and `valid_until`** are optional whole-second UTC instants. A verifier that has them
+   reports whether the claim's own `captured_at` falls inside the window, as a fact about two values the
+   author supplied - never as a verdict, because nothing has established when the claim existed.
+5. **A key id that is not in the directory is `untrusted`, not a failure** and not an accusation: a receipt
+   from a stranger is an ordinary thing, and a verifier that treated every unknown key as suspect would be
+   useless for the receipts people most often receive.
+6. **A directory that cannot be read leaves key trust `not_checked`** and adds a caveat. The caller's
+   mistake must not damage a receipt that had nothing to do with it.
+
+When a directory vouches for a key, the verdict reports `attribution.trusted_by` - what the directory says -
+while `attribution.signer` keeps reporting what the *claim* says. The two are different sentences, and a
+reader needs both.
+
+**A directory is never a check.** No level depends on one, so the same receipt verifies the same way on two
+machines with different directories: key trust is a field in the verdict, answered by the caller's
+configuration, exactly as section 6.6 says (D-007).
+
 ## 7. Verification
 
 ### 7.1 Statuses
@@ -740,7 +793,7 @@ a limitation somebody will assume away.
 | Whether a capture holds the wire bytes or the rendered document | `capture.profile` (section 4.4) | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. A claim now says which kind of capture it holds, and a verifier reports what it declared without judging it: what a capture holds cannot be worked out from its bytes, which is why the field exists. |
 | RFC 3161 token validation | `anchor.verified` | Section 8.3. The check reports `unsupported`, never `pass`. |
 | Level 3 (currency) | `subject.text`, and the report in section 7.7 | The verifier checks the claim's own fingerprint (section 4.5) and never fetches anything. Whether the page still says the same words is a comparison with its own report, performed by a caller that asks for it - `vidimus check` - and it **MUST NOT** be folded into `verified`. |
-| Key directories and trust roots | `signature.*` | Untrusting a key is a policy decision, and a format that hard-codes trust roots is a format that rots. The verdict reports `key_trusted` from a list the caller supplies (D-007). |
+| Key directories and trust roots | `attribution.trusted_by` | A **caller** supplies the directory. The format deliberately defines no signature for one and no network fetch of it: trust arrives from the caller or not at all (section 6.7, D-007). Revocation is a directory revision rather than a protocol. |
 | Size limits | `container.readable` | Nothing here caps entry sizes, so a hostile receipt can ask a verifier to inflate a large entry. A caller reading untrusted receipts **SHOULD** cap the file it opens, and a 0.2 verifier **SHOULD** refuse declared sizes above a bound. Named because the current behaviour is "it works until it does not". |
 | Provenance of authorship, watermarking | - | Out of scope. A receipt is evidence about a page, not a claim about who wrote it. |
 

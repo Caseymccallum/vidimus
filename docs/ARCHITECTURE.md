@@ -485,6 +485,38 @@ What it is not: a check. Nothing here is judged, and no level depends on it. It 
 information as `capture.profile` - reported so a reader knows what they are holding (section 4.4), not
 offered as evidence that it is true.
 
+### D-027 - A key directory is trusted because it was chosen, not because it is signed
+
+The gap was named a long time ago and left open on purpose: `signature.signer` lives inside the signature,
+which proves the key asserted the name and nothing about whether the name is true. What the format could
+always prove is *a* key signed; it could never prove *whose* (D-007).
+
+What was missing was not identity - it was a way for a caller to say "this key is Example Org's", and a
+document to say it in. `reference/src/key-directory.mjs` is that document's reader: pure, browser-safe, and
+with exactly two self-consistency rules, each refused by name rather than resolved.
+
+1. **`key_id` must be the digest of `public_key`.** The same derived-never-asserted rule as everywhere
+   else, applied to the one file that names keys without being signed by them. A directory cannot disagree
+   with itself about which key an id names.
+2. **No two entries may share a key id.** A directory that says two things about one key is not one.
+
+Three refusals in the design are worth recording, because each is the tempting alternative:
+
+- **No signature on a directory.** It moves the question back one step, and nothing on the receiving end
+  can check the answer without another directory. A `.well-known` fetch of one is *also* declined: a
+  directory reached over the network is one an attacker can replace, so fetching is the caller's decision
+  to make (the open question in section 13), not a side effect of running a verifier.
+- **No level depends on a directory.** Key trust is a field in the verdict (`key_trusted`,
+  `attribution.trusted_by`), and the levels are exactly as they were. This is what keeps "the same receipt
+  verifies the same way on two machines" true when the two machines have different directories.
+- **No judging of validity windows.** `valid_from`/`valid_until` are compared with the claim's own
+  `captured_at` and the result is reported, because the only timestamp available is the author's statement
+  about themselves - the same distinction as `time.bound: claimed_only`. A verifier that failed a receipt
+  for being outside a directory's window would be asserting a time nobody established.
+
+**A caller's mistake is a caveat, not damage.** A directory that cannot be read leaves `key_trusted` where
+it was and adds a line saying why: mistyping a path must not make somebody's receipt look worse.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

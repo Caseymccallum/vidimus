@@ -44,17 +44,20 @@ import { generateSeed, keyId, privateKeyFromSeed, rawPublicKey } from './signatu
 import { buildCapture } from './capture.mjs';
 import { compareCurrency } from './currency.mjs';
 import { textDigest } from './text.mjs';
+import { KEY_DIRECTORY_KIND, readKeyDirectory } from './key-directory.mjs';
 
 /** Every command, printed when the arguments do not make sense. */
 const USAGE = [
-  'usage: vidimus verify  <file.receipt> [--json] [--trusted-key <hex>]... [--previous <hex>]',
+  'usage: vidimus verify  <file.receipt> [--json] [--trusted-key <hex>]... [--key-directory <file>]',
+  '                                      [--previous <hex>]',
   '       vidimus inspect <file.receipt>',
-  '       vidimus check   <file.receipt> [--json] [--key <key.json>] [--out <file.receipt>] [--force]',
-  '                       [--timeout <seconds>] [--require-same-words]',
+  '       vidimus check   <file.receipt> [--json] [--key <key.json>] [--key-directory <file>]',
+  '                       [--out <file.receipt>] [--force] [--timeout <seconds>] [--require-same-words]',
   '       vidimus seal    <capture.wacz> [--url <url>] [--captured-at <ts>] [--document <file>]',
   '                       [--profile <name>] [--key <key.json> | --unsigned]',
   '                       [--chain <n> --prev <hash>] [--out <file.receipt>] [--force] [--json]',
   '       vidimus keygen  [--out <key.json>] [--signer <name>] [--force]',
+  '       vidimus keys    <directory.json>',
 ];
 
 /**
@@ -93,6 +96,7 @@ function parseArguments(argv) {
   if (command === 'seal') return parseSeal(rest);
   if (command === 'keygen') return parseKeygen(rest);
   if (command === 'check') return parseCheck(rest);
+  if (command === 'keys') return parseKeys(rest);
   return null;
 }
 
@@ -116,6 +120,16 @@ function parseCheck(rest) {
       parsed.force = true;
     } else if (argument === '--require-same-words') {
       parsed.requireSameWords = true;
+    } else if (argument === '--key-directory') {
+      const value = nextValue(rest, index, '--key-directory');
+      if (value === null) return null;
+      try {
+        parsed.keyDirectory = readDirectoryFile(value);
+      } catch (error) {
+        console.error(`${value}: could not be read as a key directory: ${error.message}`);
+        return null;
+      }
+      index += 1;
     } else if (argument === '--key' || argument === '--out') {
       const value = nextValue(rest, index, argument);
       if (value === null) return null;
@@ -173,6 +187,16 @@ function parseVerifyLike(command, rest) {
       const value = nextValue(rest, index, '--previous');
       if (value === null) return null;
       options.previousClaimHash = value;
+      index += 1;
+    } else if (argument === '--key-directory') {
+      const value = nextValue(rest, index, '--key-directory');
+      if (value === null) return null;
+      try {
+        options.keyDirectory = readDirectoryFile(value);
+      } catch (error) {
+        console.error(`${value}: could not be read as a key directory: ${error.message}`);
+        return null;
+      }
       index += 1;
     } else if (argument.startsWith('--')) {
       console.error(`unknown option: ${argument}`);
@@ -280,6 +304,34 @@ function parseKeygen(rest) {
 /** @param {string} file @returns {Uint8Array} */
 function read(file) {
   return new Uint8Array(readFileSync(file));
+}
+
+/**
+ * Read a key directory file.
+ *
+ * Parsed here and *interpreted by the verifier*: this command finds the file and turns it into JSON, and
+ * `key-directory.mjs` owns what a directory is. A path that cannot be read stops the command with a
+ * message about the file, rather than becoming a caveat inside a verdict nobody reads (section 6.7).
+ *
+ * @param {string} file
+ * @returns {unknown}
+ */
+function readDirectoryFile(file) {
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(file)));
+}
+
+/**
+ * `keys` takes one argument and no flags: it is a way of looking at a file, not a way of changing anything.
+ *
+ * @param {string[]} rest
+ * @returns {Record<string, any> | null}
+ */
+function parseKeys(rest) {
+  if (rest.length !== 1 || rest[0].startsWith('--')) {
+    console.error('keys needs the directory file, and nothing else');
+    return null;
+  }
+  return { command: 'keys', file: rest[0] };
 }
 
 /** @param {string} file @param {Record<string, any>} options @param {boolean} json */
@@ -554,7 +606,10 @@ async function fetchPage(url, seconds) {
 async function checkAgainstPage(options) {
   let verdict;
   try {
-    verdict = await verifyReceipt(read(options.file));
+    verdict = await verifyReceipt(
+      read(options.file),
+      options.keyDirectory === undefined ? {} : { keyDirectory: options.keyDirectory },
+    );
   } catch (error) {
     console.error(`${options.file}: could not be read: ${error.message}`);
     return 2;
@@ -674,6 +729,49 @@ async function checkAgainstPage(options) {
   return exitCode(verdict);
 }
 
+/**
+ * Read a key directory, and say what is in it.
+ *
+ * A directory is a statement about who holds which key, and the person who has to trust it is the person
+ * who keeps it. So this prints what it found and refuses what it cannot use, rather than waiting for a
+ * receipt to fail against it.
+ *
+ * @param {string} file
+ * @returns {number}
+ */
+function listKeys(file) {
+  let directory;
+  try {
+    directory = readKeyDirectory(readDirectoryFile(file));
+  } catch (error) {
+    console.error(`${file}: ${error.message}`);
+    return 2;
+  }
+
+  console.log(`${file}${directory.name === null ? '' : ` · ${directory.name}`}`);
+  console.log(`${directory.keys.size} key${directory.keys.size === 1 ? '' : 's'}`);
+
+  for (const entry of directory.keys.values()) {
+    const window = entry.valid_from === null && entry.valid_until === null
+      ? 'no validity window stated'
+      : `valid ${entry.valid_from ?? 'from the beginning'} to ${entry.valid_until ?? 'until further notice'}`;
+    console.log('');
+    console.log(`  ${entry.key_id}`);
+    console.log(`    ${entry.name ?? '(no name given)'}`
+      + `${entry.email === null ? '' : ` <${entry.email}>`}`);
+    if (entry.note !== null) console.log(`    ${entry.note}`);
+    console.log(`    ${window}`);
+  }
+
+  if (directory.problems.length > 0) {
+    console.log('');
+    console.error(`${directory.problems.length} ${directory.problems.length === 1 ? 'entry' : 'entries'} will not be used:`);
+    for (const problem of directory.problems) console.error(`  ${problem}`);
+    return 2;
+  }
+  return 0;
+}
+
 const parsed = parseArguments(process.argv.slice(2));
 if (parsed === null) {
   for (const line of USAGE) console.error(line);
@@ -684,6 +782,8 @@ if (parsed === null) {
   process.exitCode = await sealCapture(parsed);
 } else if (parsed.command === 'check') {
   process.exitCode = await checkAgainstPage(parsed);
+} else if (parsed.command === 'keys') {
+  process.exitCode = listKeys(parsed.file);
 } else if (parsed.command === 'keygen') {
   process.exitCode = keygen(parsed);
 } else {

@@ -33,6 +33,7 @@
 import { canonicalise, assertCanonicalBytes, CanonicalJsonError } from './canonical.mjs';
 import { fromBase64Url, isSha256Hex, utf8 } from './encode.mjs';
 import { textDigest } from './text.mjs';
+import { lookUpKey, readKeyDirectory, validityAt } from './key-directory.mjs';
 import {
   ED25519_ALG, SPEC_VERSION, claimHashOf, signedSubtree, signingMessage,
 } from './claim.mjs';
@@ -202,6 +203,23 @@ export async function verifyReceipt(bytes, options = {}) {
         + 'the bytes are checked, and what kind of capture this is, is not',
       );
     }
+
+    if (state.directoryEntry !== null) {
+      const validity = validityAt(state.directoryEntry, state.time.claimed);
+      if (validity === 'outside') {
+        state.caveats.push(
+          `the key directory says this key was valid from ${state.directoryEntry.valid_from ?? 'always'} `
+          + `to ${state.directoryEntry.valid_until ?? 'always'}, and the claim says it captured the page at `
+          + `${state.time.claimed}. Both values are the author's own; nothing here checked either.`,
+        );
+      }
+      if (validity === 'no_time') {
+        state.caveats.push(
+          'the key directory states a validity window and the claim states no usable capture time, so the '
+          + 'two were not compared',
+        );
+      }
+    }
   }
 
   const statuses = Object.fromEntries(LEVELS.map((level) => [level.id, rollUpLevel(state, level.id)]));
@@ -257,8 +275,20 @@ export async function verifyReceipt(bytes, options = {}) {
         ? 'valid'
         : (signatureCheck?.status === 'fail' ? 'invalid' : 'none'),
       key_id: state.keyId ?? (typeof signature?.key_id === 'string' ? signature.key_id : null),
+      // As the claim declares it. Self-asserted, and labelled that way by its name: `trusted_by` below is
+      // the only account of whose key this is that did not come from the receipt itself (section 6.7).
       signer: typeof signature?.signer === 'string' ? signature.signer : null,
       key_trusted: state.trust,
+      trusted_by: state.directoryEntry === null ? null : {
+        name: state.directoryEntry.name,
+        email: state.directoryEntry.email,
+        note: state.directoryEntry.note,
+        valid_from: state.directoryEntry.valid_from,
+        valid_until: state.directoryEntry.valid_until,
+        // Whether the claim's own timestamp falls inside that window. Reported, never judged: the
+        // timestamp it was compared against is the author's statement about themselves.
+        valid_at_claimed_time: validityAt(state.directoryEntry, state.time.claimed),
+      },
     },
     time: {
       claimed: state.time.claimed,
@@ -445,6 +475,7 @@ function newState() {
     claimHash: null,
     keyId: null,
     trust: 'not_checked',
+    directoryEntry: null,
     time: { claimed: null, bound: 'claimed_only', authority: null },
   };
 }
@@ -763,9 +794,47 @@ async function verifySignature(state, options, runtime) {
     ok ? undefined : 'the signature does not verify against the public key it names');
 
   const trustedKeys = Array.isArray(options.trustedKeys) ? options.trustedKeys : null;
-  state.trust = trustedKeys === null
-    ? 'not_checked'
-    : (trustedKeys.includes(computedKeyId) ? 'trusted' : 'untrusted');
+  const directory = readDirectoryOption(options, state);
+  state.directoryEntry = lookUpKey(directory, computedKeyId);
+
+  // Two ways a caller says "this key is somebody's", and they compose: a bare list of key ids, and a
+  // directory that also says *whose*. When neither was given, key trust stays `not_checked` - which is not
+  // a criticism of the receipt, it is the honest state of a question the format leaves to its reader
+  // (D-007).
+  const asked = trustedKeys !== null || directory !== null;
+  const trusted = (trustedKeys !== null && trustedKeys.includes(computedKeyId))
+    || state.directoryEntry !== null;
+  state.trust = asked ? (trusted ? 'trusted' : 'untrusted') : 'not_checked';
+}
+
+/**
+ * Read the caller's key directory, if they gave one.
+ *
+ * A directory that cannot be read is neither an error nor a failure: it is a caveat, and key trust stays
+ * `not_checked`. Nothing about a receipt becomes worse because the person checking it mistyped a path - and
+ * a verifier that failed a receipt for that would be blaming the wrong file (section 6.7).
+ *
+ * @param {{ keyDirectory?: unknown }} options
+ * @param {VerificationState} state
+ * @returns {{ keys: Map<string, import('./key-directory.mjs').KeyEntry>, name: string | null,
+ *   problems: string[] } | null}
+ */
+function readDirectoryOption(options, state) {
+  if (options.keyDirectory === undefined || options.keyDirectory === null) return null;
+  try {
+    const directory = readKeyDirectory(options.keyDirectory);
+    if (directory.problems.length > 0) {
+      state.caveats.push(
+        `the key directory has entries this verifier will not use: ${directory.problems.join('; ')}`,
+      );
+    }
+    return directory;
+  } catch (error) {
+    state.caveats.push(
+      `the key directory could not be read as one, so key trust is unchecked: ${error.message}`,
+    );
+    return null;
+  }
 }
 
 /**
@@ -1020,6 +1089,10 @@ export function summarise(state, levels) {
     ? `signed by key ${state.keyId ?? signature.key_id}${signature.signer ? ` (${signature.signer})` : ''}`
     : 'unsigned: this claim is attributed to nobody');
   if (state.trust === 'untrusted') lines.push('the signing key is not in the keys you trust');
+  if (state.directoryEntry !== null) {
+    const whom = state.directoryEntry.name ?? state.directoryEntry.email ?? '(unnamed in the directory)';
+    lines.push(`the key directory vouches for this key as: ${whom}`);
+  }
   if (state.caveats.length > 0) lines.push(`${state.caveats.length} caveat${state.caveats.length === 1 ? '' : 's'}`);
   return lines;
 }
