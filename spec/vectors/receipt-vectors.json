@@ -1499,6 +1499,170 @@
       }
     },
     {
+      "id": "text-fingerprint-with-no-readable-document",
+      "description": "a claim that declares a text fingerprint and a capture whose page cannot be found",
+      "proves": "a fingerprint is only checkable against a document, so when there is no document the check is not_checked - never a failure, because the claim may be perfectly honest and the capture simply not one this reader can open",
+      "fixture": {
+        "file": "text-fingerprint-with-no-readable-document.receipt",
+        "sha256": "b436ff8a3d06a29532930908ea5b5527285558eae7ac1c3cca2741e8324d9c66",
+        "bytes": 2332
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 1,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "checks": {
+          "subject.document": "not_checked",
+          "subject.text": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 1,
+        "claim_hash": "73e7b132ece746785e6c967e1fb86130e51eac7d39fe744a1f74bf6760b273f8",
+        "capture_profile": null,
+        "levels": {
+          "L0": "not_checked",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "not_checked"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 3,
+        "checks": {
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "text-normalization-unknown",
+      "description": "a claim whose text fingerprint names a normalization this verifier does not implement",
+      "proves": "a normalization is named by the claim, so a verifier that does not implement it says so rather than checking the digest against the wrong procedure - and an unimplemented normalization does not un-verify the bytes, because it is a gap in the verifier and not a fault in the receipt",
+      "fixture": {
+        "file": "text-normalization-unknown.receipt",
+        "sha256": "8f9e635499d3bf2e43f07748c33de076ebe94a0e97068add75ec13009a4487b2",
+        "bytes": 2334
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "pass"
+        },
+        "checks": {
+          "manifest.shape": "fail",
+          "subject.text": "pass"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "acc92127e3017273749307c29cbc65e01bfc2aca26db4a506ab4493df2b4104e",
+        "capture_profile": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "pass"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "manifest.shape": "fail",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "manifest-missing-spec-version",
+      "description": "a claim with no spec_version at all",
+      "proves": "the two checks that could answer this are different sentences - a version this verifier does not read, and a claim that is not shaped like a claim - and the specification should say which one a missing version is, because two implementations guessing differently would report different levels for the same receipt",
+      "fixture": {
+        "file": "manifest-missing-spec-version.receipt",
+        "sha256": "50749a990fc57f63fce8fc6dd5ba7ac59577167aa4f4261ac8e1dc5c4adcf72f",
+        "bytes": 2200
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "checks": {
+          "manifest.spec_version": "fail",
+          "signature.verify": "not_checked"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": null,
+        "capture_profile": null,
+        "levels": {
+          "L0": "fail",
+          "L1": "not_checked",
+          "L2": "not_checked",
+          "L3": "not_applicable"
+        },
+        "attribution": {
+          "status": "none",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
+        "checks": {
+          "manifest.spec_version": "fail",
+          "manifest.canonical": "not_checked",
+          "manifest.shape": "not_checked",
+          "claim.digest": "not_checked",
+          "capture.present": "not_checked",
+          "capture.bytes": "not_checked",
+          "capture.digest": "not_checked",
+          "capture.media_type": "not_checked",
+          "capture.wacz.readable": "not_checked",
+          "capture.wacz.resources": "not_checked",
+          "subject.document": "not_checked",
+          "signature.verify": "not_checked",
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked",
+          "subject.text": "not_applicable"
+        }
+      }
+    },
+    {
       "id": "capture-advertises-no-warc",
       "description": "a capture whose datapackage advertises no WARC record at all",
       "proves": "the record layer refuses by name: a capture that advertises nothing to read is not_checked on the document - a gap in the reader and not a fault in the receipt - while its own resource hashes, which are the part it does describe, are still checked and still pass",

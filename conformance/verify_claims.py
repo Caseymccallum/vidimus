@@ -270,8 +270,12 @@ def shape_problems(manifest: dict) -> list[str]:
             if not isinstance(fingerprint, dict):
                 problems.append("subject.text must be an object when present")
             else:
-                if not isinstance(fingerprint.get("normalization"), str):
-                    problems.append("subject.text.normalization must be a string")
+                # 0.1 names one procedure, so a claim naming another is not a claim this version describes -
+                # and this is where that is decided, not in the check. The check itself only compares the
+                # digest, which is why an implementation that invented an `unsupported` status for a foreign
+                # normalization was inventing a state this format never reaches.
+                if fingerprint.get("normalization") != "text-v1":
+                    problems.append('subject.text.normalization must be "text-v1"')
                 problems += _hex_problem(fingerprint.get("sha256"), "subject.text.sha256")
 
     tool = manifest.get("tool")
@@ -371,9 +375,6 @@ def text_status(manifest: dict, inner: dict[str, bytes] | None) -> dict:
 
     if fingerprint is None:
         return {"subject.text": "not_applicable"}
-    if not isinstance(fingerprint, dict) or fingerprint.get("normalization") != "text-v1":
-        # A normalisation this verifier does not implement is its own limit, not a fault in the receipt.
-        return {"subject.text": "unsupported"}
     if inner is None:
         return {"subject.text": "not_checked"}
 
@@ -646,24 +647,28 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
     #    canonical form still gets its capture checked - only a *shape* failure stops the capture stage - and
     #    the signature never depended on the claim being sound at all.
     shape = shape_problems(manifest)
-    inner = None
+    # The capture's own entries are read whatever the shape says, because `subject.text` is checked
+    # independently of the capture stage - it reads the document itself rather than taking a digest on trust.
+    # Looking a name up in a map is safe even when the name is one this format refuses; resolving it is not,
+    # and nothing here resolves anything.
+    capture = manifest.get("capture")
+    capture_bytes = (
+        entries.get(capture["path"])
+        if isinstance(capture, dict) and isinstance(capture.get("path"), str)
+        else None
+    )
+    inner = container.wacz_entries(capture_bytes)
+
     if shape:
-        # The names in this claim are not ones to look anything up by, so nothing is.
+        # The names in this claim are not ones to look anything up by, so the capture stage does not run.
         statuses["manifest.shape"] = "fail"
     else:
-        capture = manifest.get("capture")
-        capture_bytes = (
-            entries.get(capture["path"])
-            if isinstance(capture, dict) and isinstance(capture.get("path"), str)
-            else None
-        )
-        inner = container.wacz_entries(capture_bytes)
         statuses.update({
             key: value for key, value in container.container_statuses(entries, manifest, inner).items()
             if key != "container.readable"
         })
         statuses["subject.document"] = document_status(inner, manifest)[0]
-    return finish(statuses, derived, inner if not shape else None)
+    return finish(statuses, derived, inner)
 
 
 def _outcome(statuses: dict, checks: dict) -> str:

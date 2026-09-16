@@ -651,7 +651,7 @@ has. A digest nobody can produce the file for is not evidence of anything, and t
 "reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
 tests nothing about the reader.
 
-So `--emit <dir>` writes a **kit**: the 55 fixtures, the answers, and a README that says what to do with
+So `--emit <dir>` writes a **kit**: the 58 fixtures, the answers, and a README that says what to do with
 them. Three decisions inside that:
 
 1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
@@ -750,7 +750,7 @@ Three decisions about how it was done, which matter more than what it covered:
 3. **It reports what it did not reach, by name.** Three vectors are refused outright (a float, a `-0`, a
    version this implementation does not read), and the checks a stopped stage never reached are filled in as
    `not_checked` rather than omitted - so every fixture has a status for every check, and the refusals are
-   counted and listed separately from the 52 that agree, because a conformance report that says "no
+   counted and listed separately from the 55 that agree, because a conformance report that says "no
    disagreement" without saying what it never looked at is the exact failure mode this project is arranged
    against.
 
@@ -829,6 +829,12 @@ spell differently is the failure the section exists to prevent. They are now sta
 - **decoding** (section 4.5.2) is UTF-8 with U+FFFD for a byte that is not valid UTF-8, and no `Content-Type`
   or `<meta charset>` sniffing, because a fingerprint that depends on which of two declarations a parser
   believed is not reproducible.
+
+Section 4.5 also gained a sentence about *who owns* a claim that names a normalization this version does not
+define: `manifest.shape` refuses it, because that is a judgement about the claim, and `subject.text` compares a
+digest and nothing else. This implementation had given the text check an `unsupported` state for exactly that
+case - a status no conforming claim can reach, invented because the specification was silent about where the
+refusal belonged.
 
 Each was found by giving the vector set a fixture that exercised it. `text-extraction-rules` covers all seven
 rules at once, and found two bugs in that implementation on its first run: `&nbsp;` was missing from the named

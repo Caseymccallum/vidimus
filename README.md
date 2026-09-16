@@ -10,7 +10,7 @@
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
 [![Tests](https://img.shields.io/badge/tests-165-3DA639)](#verify-the-claims-yourself)
-[![Vectors](https://img.shields.io/badge/vectors-55-3DA639)](spec/vectors/receipt-vectors.json)
+[![Vectors](https://img.shields.io/badge/vectors-58-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
 </div>
@@ -58,7 +58,7 @@ both facts true, both reported, neither hidden behind the other.
 > one is to misread.
 
 > **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
-> browser extension: 165 tests, 55 conformance vectors, no dependencies. The format is checkable and is
+> browser extension: 165 tests, 58 conformance vectors, no dependencies. The format is checkable and is
 > being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
 > left to be discovered.
 
@@ -145,7 +145,7 @@ exists today:
   success;
 - a capture core that turns what a browser knows into a WACZ - browser-safe, and the module the
   extension imports rather than reimplements (`capture.mjs`);
-- 55 conformance vectors, rebuilt and re-hashed on every run;
+- 58 conformance vectors, rebuilt and re-hashed on every run;
 - five gates, run by `npm run verify` and by CI on Linux and Windows.
 
 The browser shell exists now too, in `extension/`: one button that seals the page you are reading,
@@ -219,7 +219,7 @@ here because a format that cannot say what it grew out of is a format nobody can
 - **A second implementation — started.** `conformance/` is a Python implementation of all 21 checks of section
   7.4, written from the specification rather than from the reference, with Ed25519 from RFC 8032, a DER/X.509
   reader, an RFC 3161 token verifier and a `text-v1` extractor alongside it. It agrees with the record on 42
-  of 55 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
+  of 58 fixtures, corroborates 3 refusals, and disagrees on none — and it rolls the checks up into `levels`,
   `verified`, `exit_code`, `capture_profile`, `attribution` and `time_bound`, agreeing there too. It meets
   section 11's four conditions: all 21 checks, the rollup rules, the canonical form byte for byte, and every
   rule-derived field of the recorded verdicts. `caveat_count` is the one field it does not produce, and section

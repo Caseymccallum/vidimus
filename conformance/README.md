@@ -58,7 +58,7 @@ python conformance/verify_claims.py ./kit          # exit 0 when nothing disagre
 ## The result
 
 ```
-claim hashes: 45 of 55 fixtures agree
+claim hashes: 45 of 58 fixtures agree
 3 refused, and the record says the same (a corroborated refusal, not a pass by silence)
 0 disagree
 ```
@@ -72,7 +72,7 @@ words extracted from the capture's document by the seven rules of section 4.5.1 
 refusals are claims the format does not admit (a float, a `-0`, a version this implementation does not read),
 and the record agrees that they are refused.
 
-Every status each check can produce is exercised across those 55 fixtures: all four of `anchor.verified`
+Every status each check can produce is exercised across those 58 fixtures: all four of `anchor.verified`
 (`pass`, `fail`, `not_checked`, `unsupported`), all four of `anchor.present`, the `pass` and `fail` of the
 text fingerprint and its `not_applicable` when a claim carries none, and both the refusals and the stage gaps
 of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
@@ -106,10 +106,10 @@ person writing the case.
 
 ## What writing it found
 
-Nine things that only showed up when somebody implemented the format somewhere else. All nine are now closed:
-six by changing the specification, which is the outcome this directory exists to produce, and three by changing
-this implementation - one of which was a claim with no `tool` block in it that verified as `true`. Every one was
-found by a fixture rather than by reading, which is the argument the rest of this file makes.
+Ten things that only showed up when somebody implemented the format somewhere else. All ten are now closed:
+seven by changing the specification, which is the outcome this directory exists to produce, and three by
+changing this implementation - one of which was a claim with no `tool` block in it that verified as `true`.
+Every one was found by a fixture rather than by reading, which is the argument the rest of this file makes.
 
 1. **`-0` cannot be refused after parsing in Python.** Rule 5 forbids `-0`. JavaScript keeps the sign
    through `JSON.parse`, so the reference rejects it there; Python's `json` returns `0`, and the sign is gone
@@ -162,7 +162,7 @@ Nine findings, six of them closed by changing the specification rather than the 
 
 **All nine are now closed**, and two of them were never missing rules at all. #8 - the stage structure, and the
 four rules about *when* a check runs - is now section 7.3.1, which is the part of the specification I would
-have said was already covered before a second implementation read it. #3 and #9 are the other kind: the check
+have said was already covered before a second implementation read it. #3 and #10 are the other kind: the check
 table has said "carries a signature with the required fields" from the first draft, and section 4.1 has said
 which fields a claim must have, and this implementation read the first check's *name* instead of its sentence
 and did not implement the second at all. Neither would have been caught by reading the prose more carefully -
@@ -201,7 +201,15 @@ picture. Both were reported by the kit as disagreements, and both were this impl
    consequences, and `claim-not-canonical` and `claim-contains-a-float` are the two vectors that tell them
    apart. **Now stated** as section 7.3.1.
 
-9. **`manifest.shape` was not implemented at all, and a claim with no `tool` block verified as `true`.** This
+9. **Nothing said which check owns a foreign `normalization`, and this implementation invented a state the
+    format never reaches.** `subject.text` names its procedure, 0.1 defines one (`text-v1`), and the
+    specification never said what a fingerprint naming another procedure should produce - so this
+    implementation returned `unsupported` from the text check, and a fixture showed the reference instead
+    refusing the claim at the *shape* check and answering `subject.text: pass`, having compared the digest
+    under the only procedure that exists. **Now stated** in section 4.5: `manifest.shape` owns it, and
+    `subject.text` has no `unsupported` state to report. A status an implementation invents for a claim that
+    is refused before reaching it is a status nobody will ever see and no vector will ever agree with.
+10. **`manifest.shape` was not implemented at all, and a claim with no `tool` block verified as `true`.** This
    one is not a gap in the specification: section 4.1's table says which fields are required, section 7.4's row
    says "required fields are present and correctly typed", and section 12 says what an entry name may be. This
    implementation checked the entry name and nothing else, so a claim that had been canonically rewritten
@@ -215,7 +223,7 @@ of what it got wrong. Section 8.1 requires an anchorless claim to report `anchor
 `anchor.verified: not_checked` - an asymmetry that looks like a mistake until the reason is read ("there is
 nothing here to have a type" against "there was nothing to verify, and this receipt does not have a verified
 time"). It is stated, it is complete, and implementing it from the text alone reproduced all four statuses that
-check can produce, across 55 fixtures - including the `unsupported` an unknown type gets, which is the rule a
+check can produce, across 58 fixtures - including the `unsupported` an unknown type gets, which is the rule a
 naive implementation would get wrong by calling it a failure. Section 8 is the part of this specification a
 second implementer can follow without asking anybody anything.
 
@@ -229,7 +237,7 @@ Section 11 lists four conditions, and this implementation meets them:
    reached filled in as `not_checked` rather than omitted;
 2. **the status, level-rollup and `verified` rules of sections 7.1-7.5** - derived independently and compared,
    and agreeing;
-3. **the canonical form, byte for byte, including the refusals** - 47 of 55 fixtures agree, and the three
+3. **the canonical form, byte for byte, including the refusals** - 47 of 58 fixtures agree, and the three
    refusals are corroborated as refusals rather than passed over in silence;
 4. **the recorded verdicts** - comparing every rule-derived field, and agreeing on all nine distinct
    combinations of `attribution`, `time_bound` and `capture_profile` the fixtures contain.

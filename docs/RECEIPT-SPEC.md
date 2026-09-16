@@ -268,6 +268,13 @@ The fingerprint is the SHA-256 of the extracted text, as UTF-8, with no trailing
 `subject.document`, and a producer that cannot extract text **MUST** omit the field rather than
 fingerprint something else.
 
+`normalization` names the procedure that produced the digest, and **0.1 defines exactly one**: `text-v1`, in
+the next subsection. A claim naming another is a claim this version does not describe, so `manifest.shape`
+refuses it - that is a judgement about the claim rather than about the words, and it is made before anything is
+extracted. `subject.text` itself does exactly one thing: extract by the named procedure and compare the digest.
+It has no "this normalization is unsupported" state, because a claim that would reach one was refused two
+stages earlier.
+
 ### 4.5.1 The extraction, stated as rules
 
 This is the normative definition. It is a deterministic walk over the document's **bytes** - not over a

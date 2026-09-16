@@ -599,6 +599,55 @@ export const CASES = [
     },
   },
   {
+    id: 'text-fingerprint-with-no-readable-document',
+    description: 'a claim that declares a text fingerprint and a capture whose page cannot be found',
+    proves: 'a fingerprint is only checkable against a document, so when there is no document the check is not_checked - never a failure, because the claim may be perfectly honest and the capture simply not one this reader can open',
+    build: () => buildReceipt({
+      wacz: waczBytes(waczEntries({ url: 'https://elsewhere.example/another-page' })),
+      manifestPatch: (manifest) => {
+        manifest.subject.text = { normalization: 'text-v1', sha256: textDigest(DEFAULT_HTML) };
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 1,
+      levels: { L0: 'not_checked', L1: 'pass', L2: 'not_checked', L3: 'not_checked' },
+      checks: { 'subject.document': 'not_checked', 'subject.text': 'not_checked' },
+    },
+  },
+  {
+    id: 'text-normalization-unknown',
+    description: 'a claim whose text fingerprint names a normalization this verifier does not implement',
+    proves: 'a normalization is named by the claim, so a verifier that does not implement it says so rather than checking the digest against the wrong procedure - and an unimplemented normalization does not un-verify the bytes, because it is a gap in the verifier and not a fault in the receipt',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        manifest.subject.text = { normalization: 'text-v2', sha256: textDigest(DEFAULT_HTML) };
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'pass', L2: 'not_checked', L3: 'pass' },
+      checks: { 'manifest.shape': 'fail', 'subject.text': 'pass' },
+    },
+  },
+  {
+    id: 'manifest-missing-spec-version',
+    description: 'a claim with no spec_version at all',
+    proves: 'the two checks that could answer this are different sentences - a version this verifier does not read, and a claim that is not shaped like a claim - and the specification should say which one a missing version is, because two implementations guessing differently would report different levels for the same receipt',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        delete manifest.spec_version;
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'fail', L1: 'not_checked', L2: 'not_checked', L3: 'not_applicable' },
+      checks: { 'manifest.spec_version': 'fail', 'signature.verify': 'not_checked' },
+    },
+  },
+  {
     id: 'capture-advertises-no-warc',
     description: 'a capture whose datapackage advertises no WARC record at all',
     proves: 'the record layer refuses by name: a capture that advertises nothing to read is not_checked on the document - a gap in the reader and not a fault in the receipt - while its own resource hashes, which are the part it does describe, are still checked and still pass',
