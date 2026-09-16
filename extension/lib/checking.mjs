@@ -21,7 +21,9 @@
 import { toHex } from '../../reference/src/encode.mjs';
 import { sha256 } from '../../reference/src/sha256.mjs';
 import { verifyReceipt } from '../../reference/src/verify.mjs';
-import { readZipInBrowser } from './browser-zip.mjs';
+import { findMainDocument, isGzipped } from '../../reference/src/warc.mjs';
+import { findWarcEntry } from '../../reference/src/wacz.mjs';
+import { readZipInBrowser, inflateGzip } from './browser-zip.mjs';
 
 /** The algorithm, named once here as it is named once in the claim's shape. */
 const ALGORITHM = { name: 'Ed25519' };
@@ -35,6 +37,26 @@ export const browserRuntime = {
   verifySignature: async (message, signature, rawPublicKey) => {
     const key = await crypto.subtle.importKey('raw', rawPublicKey, ALGORITHM, false, ['verify']);
     return crypto.subtle.verify(ALGORITHM, key, signature, message);
+  },
+
+  /**
+   * The document a capture holds, so a browser can check the checks that re-read it.
+   *
+   * Without this, a browser would report `subject.text: not_checked` while the command line reported a
+   * `pass` for the same receipt - two verdicts for one file, which is the thing the shared rules exist to
+   * prevent. A browser has `DecompressionStream('gzip')` where Node has `gunzipSync`, and a WARC reader
+   * that is pure (D-021).
+   *
+   * @param {Uint8Array} captureBytes
+   * @param {string | null} url
+   * @returns {Promise<Record<string, any>>}
+   */
+  mainDocument: async (captureBytes, url) => {
+    const warc = await findWarcEntry(captureBytes, { readContainer: readZipInBrowser });
+    // A browser's inflater is asynchronous, so the gzip step happens here and the record layer below
+    // stays the synchronous, shared one (D-021).
+    const plain = isGzipped(warc.bytes) ? await inflateGzip(warc.bytes) : warc.bytes;
+    return findMainDocument(plain, url, { digest: (bytes) => toHex(sha256(bytes)) });
   },
 };
 

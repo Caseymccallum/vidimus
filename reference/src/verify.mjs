@@ -32,6 +32,7 @@
 
 import { canonicalise, assertCanonicalBytes, CanonicalJsonError } from './canonical.mjs';
 import { fromBase64Url, isSha256Hex, utf8 } from './encode.mjs';
+import { textDigest } from './text.mjs';
 import {
   ED25519_ALG, SPEC_VERSION, claimHashOf, signedSubtree, signingMessage,
 } from './claim.mjs';
@@ -93,7 +94,7 @@ export const LEVELS = [
   { id: 'L0', name: 'integrity', claim: 'these are the bytes this receipt names' },
   { id: 'L1', name: 'attribution', claim: 'the named key signed this claim' },
   { id: 'L2', name: 'time', claim: 'a third party attested the claim existed at a time' },
-  { id: 'L3', name: 'currency', claim: 'the page still matches, as of now' },
+  { id: 'L3', name: 'currency', claim: 'the words in the capture are the words the claim fingerprints' },
 ];
 
 /** Field name for the claim digest. Kept in one place so the spec can cite it. */
@@ -162,7 +163,7 @@ export async function verifyReceipt(bytes, options = {}) {
     recordGaps(state, 'L1', gapReason(state, 'L1'));
     verifyAnchor(state, options);
     recordGaps(state, 'L2', gapReason(state, 'L2'));
-    verifyText(state);
+    await verifyText(state, runtime);
     recordGaps(state, 'L3', gapReason(state, 'L3'));
   }
 
@@ -838,26 +839,58 @@ function verifyAnchor(state, options) {
 }
 
 /**
- * Level 3: the text fingerprint, which this verifier structurally cannot check.
+ * Level 3: the claim's account of the page's text.
  *
- * `text-v1` is defined over a rendered document - the same deterministic DOM walk Shelf
- * performs when it indexes a page - and the reference verifier has no HTML engine and no
- * layout. So it validates the *declaration* and reports `not_checked` with that reason
- * rather than pretending. The extension is the reference implementation for this check
- * because it already has the engine (D-009).
+ * `text-v1` is defined over bytes (section 4.5 of the specification), so this is not a question about the
+ * live page: it asks whether the words the claim fingerprints are the words the capture holds. That is
+ * answerable offline, which is why a verifier can answer it rather than caveat it - and worth answering,
+ * because it is the check that catches a producer whose extractor disagreed with the definition. It is
+ * the bug this project's own fixture had, which is how the check came to exist.
+ *
+ * Whether the page *still* says the same words needs a request, which a verifier does not make. That is
+ * the currency report: a separate act, with a separate output, and no effect on `verified` (D-005).
  *
  * @param {VerificationState} state
+ * @param {Record<string, any>} runtime
  */
-function verifyText(state) {
+async function verifyText(state, runtime) {
   const manifest = /** @type {Record<string, any>} */ (state.manifest);
   const text = manifest.subject?.text;
   if (text === undefined) {
     record(state, 'subject.text', 'not_applicable', 'the claim carries no text fingerprint');
     return;
   }
-  record(state, 'subject.text', 'not_checked',
-    'text-v1 is defined over a rendered document, and this verifier has no HTML engine');
-  state.caveats.push('a text fingerprint is declared but was not checked by this verifier');
+
+  const captureBytes = state.entries.get(manifest.capture.path);
+  if (captureBytes === undefined) {
+    record(state, 'subject.text', 'not_checked',
+      'the capture this fingerprint describes is not in the receipt, so there was nothing to re-read');
+    return;
+  }
+  if (typeof runtime.mainDocument !== 'function') {
+    record(state, 'subject.text', 'not_checked',
+      "this runtime cannot re-read a capture's document, so the fingerprint was not recomputed");
+    state.caveats.push('a text fingerprint is declared and this runtime could not recompute it');
+    return;
+  }
+
+  let document;
+  try {
+    document = await runtime.mainDocument(captureBytes, manifest.subject.url);
+  } catch (error) {
+    // A capture whose WARC this reader will not read is not a capture that failed a test. Reporting it as
+    // a failure would be the safer lie, and still a lie (D-021).
+    record(state, 'subject.text', 'not_checked',
+      `the capture's document could not be re-read, so the fingerprint was not recomputed: ${error.message}`);
+    state.caveats.push('a text fingerprint is declared and its document could not be re-read');
+    return;
+  }
+
+  const actual = textDigest(document.body);
+  record(state, 'subject.text', actual === text.sha256 ? 'pass' : 'fail',
+    actual === text.sha256
+      ? undefined
+      : `the words in the capture hash to ${actual}, and the claim says ${text.sha256}`);
 }
 
 /**

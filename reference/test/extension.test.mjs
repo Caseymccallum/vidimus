@@ -106,6 +106,11 @@ test('the browser runtime checks a receipt the browser sealed', async () => {
   assert.equal(verdict.levels.L1.status, 'pass');
   assert.equal(verdict.attribution.key_id, key.keyId);
   assert.equal(verdict.receipt.claim_hash, sealed.claimHash);
+  // The text fingerprint is computed by the browser producer and checked by the browser verifier, which
+  // means the browser re-read its own capture's WARC, inflated it with `DecompressionStream('gzip')` and
+  // re-extracted the words - the whole path, in the runtime that used to report `not_checked` (D-024).
+  assert.equal(verdict.levels.L3.status, 'pass');
+  assert.equal(verdict.checks.find((check) => check.id === 'subject.text').status, 'pass');
 });
 
 test('the browser and the command line reach the same verdict, word for word', async () => {

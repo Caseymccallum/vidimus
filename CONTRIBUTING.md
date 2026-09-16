@@ -53,7 +53,7 @@ worth more than any amount of additional code.
 npm run verify                              # what CI runs: everything below, in order
 npm run syntax                              # every module parses
 npm run check:language                      # British English, enforced
-npm test                                    # 112 tests, no install
+npm test                                    # 121 tests, no install
 npm run check:docs                          # the counts the documentation quotes are real
 npm run vectors:generate                    # rebuild the fixtures to look at one
 node reference/src/cli.mjs verify spec/fixtures/capture-digest-mismatch.receipt

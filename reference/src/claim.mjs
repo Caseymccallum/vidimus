@@ -25,6 +25,7 @@
 import { canonicalise } from './canonical.mjs';
 import { toHex, utf8 } from './encode.mjs';
 import { sha256 } from './sha256.mjs';
+import { TEXT_NORMALIZATION } from './text.mjs';
 import { writeZip } from './zip-write.mjs';
 
 /**
@@ -120,6 +121,8 @@ export function claimHashOf(manifest) {
  *   contentType?: string | null,
  *   capturedAt: string,
  *   document: { sha256: string, bytes: number },
+ *   text?: { sha256: string } | null,
+ *   captureProfile?: string | null,
  *   anchor?: Record<string, any>,
  *   tool?: { name: string, version: string },
  * }} input
@@ -151,6 +154,12 @@ export function draftClaim(input) {
         ? { content_type: input.contentType }
         : {}),
       document: { sha256: input.document.sha256, bytes: input.document.bytes },
+      // The words the page put in front of the reader, fingerprinted by `text-v1` (section 4.5). Derived
+      // from the same bytes as the document digest above, so the two cannot describe different documents -
+      // and a producer that cannot extract text simply omits it rather than guessing.
+      ...(typeof input.text?.sha256 === 'string'
+        ? { text: { normalization: TEXT_NORMALIZATION, sha256: input.text.sha256 } }
+        : {}),
     },
     tool: input.tool ?? { name: 'vidimus', version: SPEC_VERSION },
     signature: null,

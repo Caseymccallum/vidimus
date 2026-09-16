@@ -21,12 +21,16 @@
  * It also checks the record's own `WARC-Payload-Digest` when the capture states one, because a
  * capture that disagrees with itself about its own bytes is not something to seal a claim over.
  *
+ * It is **pure and runtime-free**: the digest and the inflater are passed in. That is what lets the same
+ * record layer run in a command line (Node's `zlib`, Node's SHA-256) and in a browser
+ * (`DecompressionStream('gzip')`, WebCrypto) - which matters because the verifier re-reads a capture's
+ * document to check a text fingerprint (section 4.5 of the specification), and a browser that could not
+ * read a WARC would have to report that check as `not_checked` while the command line reported a `pass`.
+ *
  * @module warc
  */
 
-import { gunzipSync } from 'node:zlib';
-
-import { sha256 } from './digest.mjs';
+import { fromBase64, fromLatin1, latin1 } from './encode.mjs';
 
 /** Thrown for anything this reader will not guess at. */
 export class WarcError extends Error {
@@ -64,13 +68,23 @@ export function isGzipped(bytes) {
  * the bytes that survived - so a capture cut short is refused at one layer or the other, and never
  * half-read.
  *
+ * The inflater comes from the caller, because the two runtimes spell this differently and neither
+ * spelling belongs in a format. A runtime that supplies none is told so by name rather than being
+ * handed an unreadable stream.
+ *
  * @param {Uint8Array} bytes
+ * @param {(bytes: Uint8Array) => Uint8Array} [inflate]
  * @returns {Uint8Array}
  */
-export function decompress(bytes) {
+export function decompress(bytes, inflate) {
   if (!isGzipped(bytes)) return bytes;
+  if (typeof inflate !== 'function') {
+    throw new WarcError(
+      'this capture holds a gzipped WARC and the runtime supplied no inflater for it',
+    );
+  }
   try {
-    return new Uint8Array(gunzipSync(Buffer.from(bytes)));
+    return inflate(bytes);
   } catch (error) {
     throw new WarcError(`the capture's WARC file could not be decompressed: ${error.message}`);
   }
@@ -98,8 +112,8 @@ export function decompress(bytes) {
  */
 export function readWarc(bytes) {
   // latin1 is a byte-for-byte view of the buffer, so string searching stays exact and payloads
-  // containing arbitrary binary survive the round trip through `Buffer.from(..., 'latin1')`.
-  const text = Buffer.from(bytes).toString('latin1');
+  // containing arbitrary binary survive the round trip.
+  const text = fromLatin1(bytes);
   const starts = [];
   let found = text.indexOf(RECORD_MAGIC);
   while (found !== -1) {
@@ -138,7 +152,7 @@ export function readWarc(bytes) {
       date: headers.get('warc-date') ?? null,
       contentType: headers.get('content-type') ?? null,
       headers,
-      payload: new Uint8Array(Buffer.from(slice.slice(headerEnd + 4), 'latin1')),
+      payload: latin1(slice.slice(headerEnd + 4)),
     });
   });
 
@@ -181,7 +195,7 @@ export function toClaimTimestamp(value) {
  * @returns {HttpResponse}
  */
 export function parseHttpResponse(payload) {
-  const text = Buffer.from(payload).toString('latin1');
+  const text = fromLatin1(payload);
   const headerEnd = text.indexOf('\r\n\r\n');
   if (headerEnd === -1) {
     throw new WarcError('the response record has no HTTP header block, so it holds no document');
@@ -205,7 +219,7 @@ export function parseHttpResponse(payload) {
     if (!headers.has(name)) headers.set(name, line.slice(colon + 1).trim());
   }
 
-  let body = new Uint8Array(Buffer.from(text.slice(headerEnd + 4), 'latin1'));
+  let body = latin1(text.slice(headerEnd + 4));
   const declared = headers.get('content-length');
   if (declared !== undefined) {
     if (!/^\d+$/.test(declared)) {
@@ -240,18 +254,27 @@ export function parseHttpResponse(payload) {
 /**
  * Find the response record for a page, and return the document it holds.
  *
+ * **The bytes must already be inflated**, and the digest must be synchronous. Both are deliberate: the
+ * platform's decompressor is a platform's business (Node has `gunzipSync`, a browser has an asynchronous
+ * `DecompressionStream`), while the digest used here is this project's own SHA-256, which exists in both
+ * runtimes and is pinned against each platform's by a test. Keeping this function synchronous is what lets
+ * the producer read a capture without turning every one of its callers asynchronous.
+ *
  * With no URL, the first response record is used, which is what a single-page capture holds. With a
  * URL, the record whose `WARC-Target-URI` matches it is used - and if there is none, this refuses and
  * lists the URLs it did find, because "no record for your page" is a fact the caller needs, not a
  * reason to fall back to a different page.
  *
- * @param {Uint8Array} warcBytes
+ * @param {Uint8Array} warcBytes Plain (inflated) WARC bytes.
  * @param {string | null} [url]
+ * @param {{ digest?: ((bytes: Uint8Array) => string) | null }} [runtime] A digest for the record's own
+ * stated `WARC-Payload-Digest`. Without one, a record that states a hash is refused by name rather than
+ * passed on unchecked.
  * @returns {MainDocument}
  * @throws {WarcError}
  */
-export function findMainDocument(warcBytes, url = null) {
-  const records = readWarc(decompress(warcBytes));
+export function findMainDocument(warcBytes, url = null, runtime = {}) {
+  const records = readWarc(warcBytes);
   const responses = records.filter((record) => record.type === 'response');
   if (responses.length === 0) {
     throw new WarcError(
@@ -272,7 +295,7 @@ export function findMainDocument(warcBytes, url = null) {
     chosen = match;
   }
 
-  checkPayloadDigest(chosen);
+  checkPayloadDigest(chosen, runtime.digest ?? null);
   const response = parseHttpResponse(chosen.payload);
   return {
     url: chosen.targetUri,
@@ -292,18 +315,27 @@ export function findMainDocument(warcBytes, url = null) {
  * possibility and the reader should not pretend otherwise.
  *
  * A digest in any algorithm other than SHA-256 is left alone: this reader does not know the
- * conventions of an algorithm it has not implemented, and guessing would be worse than silence.
+ * conventions of an algorithm it has not implemented, and guessing would be worse than silence. A
+ * SHA-256 digest with no digest function to check it against is a *named* refusal rather than a silent
+ * skip, because skipping it would make "this capture is self-consistent" a claim this reader never
+ * established.
  *
  * @param {WarcRecord} record
+ * @param {((bytes: Uint8Array) => string) | null} digest
  */
-function checkPayloadDigest(record) {
+function checkPayloadDigest(record, digest) {
   const stated = record.headers.get('warc-payload-digest');
   if (stated === undefined) return;
   const match = /^sha256:([A-Za-z0-9+/=_-]+)$/.exec(stated);
   if (match === null) return;
+  if (digest === null) {
+    throw new WarcError(
+      'the capture states a WARC-Payload-Digest and no digest function was supplied to check it with',
+    );
+  }
 
-  const actual = sha256(record.payload);
-  const statedHex = Buffer.from(match[1], 'base64').toString('hex');
+  const actual = digest(record.payload);
+  const statedHex = [...fromBase64(match[1])].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   if (statedHex !== actual) {
     throw new WarcError(
       `the capture states ${stated} for this record's payload, and the payload hashes to `

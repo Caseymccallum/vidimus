@@ -51,6 +51,26 @@ async function inflateRaw(bytes, name) {
 }
 
 /**
+ * Inflate a gzip stream, the way a browser can.
+ *
+ * A WACZ's WARC is gzipped, so a browser that wants to re-read a captured document - to check a text
+ * fingerprint, or to compare a page against a receipt - needs this as well as `inflateRaw`. Node spells
+ * the same thing `gunzipSync`; the two are pinned against each other by the same test that pins the
+ * container readers.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {Promise<Uint8Array>}
+ */
+export async function inflateGzip(bytes) {
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch (error) {
+    throw new ZipError(`the WARC could not be decompressed: ${error.message}`);
+  }
+}
+
+/**
  * @param {Uint8Array} bytes
  * @returns {number}
  */

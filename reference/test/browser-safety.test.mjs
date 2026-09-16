@@ -94,7 +94,7 @@ test('the entry points do not quietly acquire a Node dependency', () => {
   // `capture.mjs` and the extension's `sealing.mjs` are what a browser bundles. If either ever reaches
   // `digest.mjs`, `signature.mjs`, `zip.mjs`, `warc.mjs`, `seal.mjs`, `fixtures.mjs` or `verify.mjs`,
   // the reader/writer split has been undone.
-  const forbidden = ['digest.mjs', 'signature.mjs', 'zip.mjs', 'warc.mjs', 'seal.mjs', 'fixtures.mjs', 'runtime.mjs'];
+  const forbidden = ['digest.mjs', 'signature.mjs', 'zip.mjs', 'seal.mjs', 'fixtures.mjs', 'runtime.mjs'];
   for (const entry of ENTRIES) {
     const modules = reachable(entry).map((module) => module.split('/').pop());
     for (const name of forbidden) {
@@ -103,6 +103,11 @@ test('the entry points do not quietly acquire a Node dependency', () => {
       //
       // `verify.mjs` is deliberately *not* on this list any more: since the verifier takes a runtime, its
       // rules import nothing from Node, and the browser imports them directly (D-021).
+      //
+      // `warc.mjs` came off the list for the same reason: its digest and its inflater are passed in, so
+      // the record layer is pure, and a browser that can read a capture's document reports the same
+      // `subject.text` verdict as the command line instead of a `not_checked` of its own. That it stays
+      // pure is not a promise: the walk above fails the moment it imports anything from Node.
       assert.ok(
         !modules.includes(name),
         `${entry} now reaches ${name}, which needs Node`,

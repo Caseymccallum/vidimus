@@ -21,7 +21,10 @@ zip-write.mjs   the ZIP writer: browser-safe, stored entries only, deterministic
 zip.mjs         the ZIP reader: needs node:zlib to inflate, and re-exports the writer
 gzip.mjs        a stored-deflate gzip writer, so fixtures are byte-identical everywhere
 signature.mjs   Ed25519 over raw keys: sign, verify, key ids, and the one random seed generator
-warc.mjs        a strict, narrow WARC reader: the producer's one window into somebody else's format
+warc.mjs        a strict, narrow WARC reader: pure, with its inflater and digest supplied
+wacz.mjs        finding the WARC inside a WACZ, for either runtime
+warc-node.mjs   the record layer with Node's inflater and the project's SHA-256 supplied
+text.mjs        `text-v1`: the words a reader would see, extracted deterministically from bytes
 capture.mjs     what a browser knows, turned into a WACZ - browser-safe, and the extension's entry point
 verify.mjs      the verifier: the check table, the stages, the verdict, the levels
 seal.mjs        the producer: a capture in, a signed receipt out
@@ -401,6 +404,43 @@ The extension gathers the files by **fetching them again**, and reports how many
 because a browser will not hand over the body of a response the page made. Those fetches are the only
 requests the extension makes, and `extension/README.md` says so in the same breath as the permission table.
 
+### D-024 - `text-v1` is defined over bytes, so every verifier can check it
+
+The fingerprint used to be this project's one check that could not run: `subject.text: not_checked`, "this
+verifier has no HTML engine". The argument was that the normative definition lived in Shelf's
+`extractText`, and that checking it needed a DOM. Both halves of that were wrong, in opposite directions:
+
+- **The definition is now written down** (section 4.5.1 of the specification). A format that defers a
+  normative definition to another project's source file is not a format: a second implementer can read a
+  rule and disagree with it, but they cannot read a rule that is a TypeScript function. Shelf's
+  `extractText` is where the rules came from and the specification says so.
+- **A DOM was never needed.** The rules are a walk, not a layout: which elements end a line, which are
+  skipped, how whitespace collapses, what a stray `<` means. `innerText` would have needed a browser, and
+  that is one of the reasons Shelf refuses it too.
+
+Two consequences worth recording:
+
+1. **One extractor, both runtimes.** `text.mjs` has no DOM and no Node: it walks bytes, which is what a
+   verifier holding a capture has. A receipt therefore cannot be a `pass` on a command line and
+   `not_checked` in a browser - two answers to one question, which is what the shared rules exist to
+   prevent. Reaching that point meant making the WARC record layer pure as well, because a browser has to
+   re-read a capture's document before it can check the fingerprint at all: the runtime seam gained
+   `mainDocument`, and `warc.mjs` gave up its own `zlib` and digest imports (D-021, extended).
+2. **L3 can now pass**, and the level's claim changed to what it actually establishes: *the words in the
+   capture are the words the claim fingerprints*. It still does not say the page says them **now** - that
+   is a request, and a verifier makes none (D-005). The coverage rule in `docs/CONFORMANCE.md` that said
+   "every level reaches a pass except L3" is gone, deliberately, and the level's old wording ("the page
+   still matches, as of now") is gone with it.
+
+**This check found a bug in this project's own fixtures.** `valid-with-text` declared a digest over the
+heading alone - plausible, and not the words the capture held - and nothing had ever contradicted it,
+because nothing checked it. It is now `text-fingerprint-wrong`, kept as a vector *because* it was real: it
+is exactly what a producer whose extractor disagreed with the definition would emit.
+
+**What it still does not do** is compare the document it re-read with `subject.document.sha256`. That would
+be a new check rather than a new implementation, and the specification's section 9 names it as a candidate
+for 0.2 rather than leaving a reader to assume the two are the same thing.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,
@@ -410,11 +450,10 @@ requests the extension makes, and `extension/README.md` says so in the same brea
   rather than silently absent.
 - **A conformance table of other implementations.** There is one implementation; a table with one row
   would be decoration.
-- **A network layer.** Level 3 is specified and not performed. A caller that wants it performs the
-  fetch and reports the result separately; D-005 forbids folding it into `verified`.
-- **In-browser verification.** The shell seals a receipt and cannot check it, which needs a WebCrypto
-  verification path and a pure inflate for reading a container - the mirror images of the two pieces the
-  capture path already has.
-- **A richer capture.** What it holds is the document as rendered, without the stylesheets and images
-  around it. The format has a question to answer first: a claim does not yet say which kind of capture
-  it holds (section 13 of the specification).
+- **A network layer.** Level 3 is specified as a *report* and not performed: a caller that wants it runs
+  the comparison and prints it separately, and D-005 forbids folding it into `verified`.
+- **In-browser verification.** Landed in D-021: the verifier takes a runtime, so the extension checks a
+  receipt with the same rules the command line uses, including the text fingerprint below.
+- **None of it attached to anything yet.** A receipt stands beside the work it supports - a citation, a
+  PDF, a commit - and nothing here writes a citation entry or embeds a receipt in a document. Named as
+  the remaining distance between the format and its users (section 13 of the specification).

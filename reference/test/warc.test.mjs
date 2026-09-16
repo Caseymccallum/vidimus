@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 
 import {
   WarcError, decompress, findMainDocument, isGzipped, parseHttpResponse, readWarc, toClaimTimestamp,
-} from '../src/warc.mjs';
+} from '../src/warc-node.mjs';
 import { DEFAULT_HTML, DEFAULT_URL, warcRecord } from '../src/fixtures.mjs';
 import { sha256, utf8 } from '../src/digest.mjs';
 import { storeGzip } from '../src/gzip.mjs';

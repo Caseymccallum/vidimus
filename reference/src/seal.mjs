@@ -19,7 +19,9 @@
 
 import { sha256, utf8, toBase64Url } from './digest.mjs';
 import { readZip } from './zip.mjs';
-import { findMainDocument } from './warc.mjs';
+import { findMainDocument } from './warc-node.mjs';
+import { warcEntryOf } from './wacz.mjs';
+import { textDigest } from './text.mjs';
 import { ED25519_ALG, draftClaim, finishClaim } from './claim.mjs';
 import { rawPublicKey, keyId, signMessage } from './signature.mjs';
 
@@ -32,8 +34,10 @@ export class SealError extends Error {
   }
 }
 
-/** A WACZ advertises its records in `datapackage.json`; the WARC is the one this reader needs. */
-const WARC_RESOURCE = /\.warc(\.gz)?$/i;
+/**
+ * A WACZ advertises its records in `datapackage.json`, and finding the WARC among them now lives in
+ * `wacz.mjs`, where the browser's reader can reach it too.
+ */
 
 /**
  * Find the WARC inside a WACZ, and check it against the hash the capture advertises for it.
@@ -54,45 +58,26 @@ export function findCaptureWarc(waczBytes) {
     throw new SealError(`the capture is not a readable WACZ: ${error.message}`);
   }
 
-  const advertised = archive.entries.get('datapackage.json');
-  if (advertised === undefined) {
-    throw new SealError('the capture has no datapackage.json, so it advertises no WARC to read');
-  }
-
-  let dataPackage;
+  // The lookup itself lives in `wacz.mjs`, because the browser's verifier needs the same one and a
+  // second copy of "where is the WARC" is a second answer to a question with one right answer.
+  let entry;
   try {
-    dataPackage = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(advertised));
+    entry = warcEntryOf(archive);
   } catch (error) {
-    throw new SealError(`the capture's datapackage.json is not valid JSON: ${error.message}`);
+    throw new SealError(error.message);
   }
 
-  const resources = Array.isArray(dataPackage?.resources) ? dataPackage.resources : [];
-  const resource = resources.find(
-    (candidate) => typeof candidate?.path === 'string' && WARC_RESOURCE.test(candidate.path),
-  );
-  if (resource === undefined) {
-    const paths = resources.map((candidate) => candidate?.path ?? '(no path)');
-    throw new SealError(
-      `the capture advertises no WARC record to read: ${paths.length > 0 ? paths.join(', ') : 'nothing'}`,
-    );
-  }
-
-  const warc = archive.entries.get(resource.path);
-  if (warc === undefined) {
-    throw new SealError(`the capture advertises "${resource.path}" and does not contain it`);
-  }
-
-  if (typeof resource.hash === 'string' && /^sha256:[0-9a-f]{64}$/.test(resource.hash)) {
-    const actual = `sha256:${sha256(warc)}`;
-    if (actual !== resource.hash) {
+  if (entry.advertised !== null && /^sha256:[0-9a-f]{64}$/.test(entry.advertised)) {
+    const actual = `sha256:${sha256(entry.bytes)}`;
+    if (actual !== entry.advertised) {
       throw new SealError(
-        `the capture advertises ${resource.hash} for "${resource.path}" and it hashes to ${actual}. `
+        `the capture advertises ${entry.advertised} for "${entry.path}" and it hashes to ${actual}. `
         + 'That is a corrupt capture, and nothing was written.',
       );
     }
   }
 
-  return warc;
+  return entry.bytes;
 }
 
 /**
@@ -167,6 +152,9 @@ export function sealFromCapture(input) {
     contentType: fromCapture === null ? null : fromCapture.contentType,
     capturedAt,
     document: { sha256: sha256(body), bytes: body.length },
+    // The words, from the same bytes. Always: the fingerprint is derived, costs nothing to recompute, and
+    // is what makes "the bytes changed but the words did not" answerable later (section 4.5).
+    text: { sha256: textDigest(body) },
     captureProfile: input.captureProfile ?? null,
     anchor: input.anchor ?? { type: 'none' },
   });

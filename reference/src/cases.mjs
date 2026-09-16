@@ -22,6 +22,7 @@
 
 import { canonicalJson, buildReceipt, prettyJson, signer, stranger } from './fixtures.mjs';
 import { sha256, toBase64Url, utf8 } from './digest.mjs';
+import { textDigest } from './text.mjs';
 import { FIXTURE_DATE, waczBytes, waczEntries, DEFAULT_HTML, SPEC_VERSION } from './fixtures.mjs';
 import { writeZip } from './zip.mjs';
 import { signMessage } from './signature.mjs';
@@ -140,18 +141,42 @@ export const CASES = [
   },
   {
     id: 'valid-with-text',
-    description: 'a receipt that declares a text fingerprint',
-    proves: 'this verifier says it did not check the fingerprint instead of implying it did',
+    description: 'a receipt that declares a text fingerprint the capture actually has',
+    proves: 'a fingerprint is checked rather than caveated: the words are re-extracted from the capture and hashed, so this level can pass - and a producer whose extractor disagreed with the definition is caught',
     build: () => buildReceipt({
       manifestPatch: (manifest) => {
-        manifest.subject.text = { normalization: 'text-v1', sha256: sha256(utf8('A page worth citing')) };
+        manifest.subject.text = {
+          normalization: 'text-v1',
+          sha256: textDigest(DEFAULT_HTML),
+        };
       },
     }).bytes,
     expect: {
       verified: true,
       exit_code: 0,
-      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'not_checked' },
-      checks: { 'subject.text': 'not_checked' },
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'pass' },
+      checks: { 'subject.text': 'pass' },
+    },
+  },
+  {
+    id: 'text-fingerprint-wrong',
+    description: 'a receipt whose text fingerprint is not the words in its own capture',
+    proves: 'the fingerprint is checked against the capture, so a claim that says the page said something it did not is a failure - this is the shape of the bug this project\'s own fixture had, found by the check the fixture made necessary',
+    build: () => buildReceipt({
+      manifestPatch: (manifest) => {
+        // Plausible, and wrong: the heading alone, without the paragraph that follows it. A producer that
+        // fingerprinted the wrong element would produce exactly this.
+        manifest.subject.text = {
+          normalization: 'text-v1',
+          sha256: sha256(utf8('A page worth citing')),
+        };
+      },
+    }).bytes,
+    expect: {
+      verified: false,
+      exit_code: 2,
+      levels: { L0: 'pass', L1: 'pass', L2: 'not_checked', L3: 'fail' },
+      checks: { 'subject.text': 'fail' },
     },
   },
   {

@@ -26,7 +26,7 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 112 tests: the canonical form's rules, the container reader, the verifier's invariants, and the vectors. |
+| `npm test` | 121 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. |
@@ -83,9 +83,10 @@ Grouped by what they are for:
   is not a check. The suite fails if any of the 20 is only ever observed passing.
 - **All three exit codes occur.** `0`, `1` and `2` each appear in the record, so the distinction
   between "verified", "nothing proven" and "broken" is tested rather than described.
-- **Every level reaches `pass` at least once, except L3.** L0, L1 and L2 each have a passing case. L3
-  cannot, and the test asserts that it does not: the day an L3 pass appears is the day section 9 of
-  the specification is out of date.
+- **Every level reaches `pass` at least once**, including L3. The text fingerprint is defined over bytes
+  (section 4.5 of the specification), so `valid-with-text` is a pass rather than a `not_checked` of this
+  implementation's own. The rule that used to exclude L3 is gone, and so is the row in section 6 that
+  named it as a gap.
 - **Every non-passing check carries a reason.**
 - **Verdicts are reproducible.** The same bytes produce byte-identical verdicts, asserted for every
   case.
@@ -97,7 +98,7 @@ Named here, with what each would take, so that none of them is mistaken for a de
 | Gap | Where it shows | What it would take |
 | --- | --- | --- |
 | **RFC 3161 anchors** | `anchor.verified: unsupported` | A CMS `SignedData` parser, chain validation against a caller-supplied TSA list, `messageImprint` comparison, and `genTime` handling. Section 8.3 of the specification already states the four steps required before a `pass` is allowed, so the work is bounded and the answer cannot be guessed at. |
-| **`text-v1`** | `subject.text: not_checked` | An HTML engine. Shelf's `extractText` is the normative definition, so the extension conforms by reusing it rather than by reimplementing it - which is also why D-009 refuses to write a second extractor here. |
+| **`subject.document` is not re-derived** | `capture.wacz.resources` passes while the document digest is unchecked | The verifier re-reads a capture's document to check the text fingerprint, and does not compare it with `subject.document.sha256`. Comparing them is a new check rather than new code, so it needs a specification change and vectors - named in section 9 of the specification as a candidate for 0.2. |
 | **Level 3 (currency)** | Not performed at all | A specified comparison: what to fetch, what to compare, and a report format for "the bytes changed and the words did not". It must stay outside `verified`, and it must be impossible to trigger by accident. |
 | **Size limits** | `container.readable` accepts any declared entry size | A cap applied before inflating, and a status for a receipt that exceeds it. Recorded as a limitation in the specification and the threat model so that it is not mistaken for a design choice. |
 | **A second implementation** | Section 11's conformance list | Another language reading the same vectors. Until then the vectors pin one implementation's answers, which is agreement rather than corroboration, and the threat model says as much. |

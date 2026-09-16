@@ -30,8 +30,8 @@ in `spec/vectors/receipt-vectors.json` are the record of what it answers, and
 `npm run verify` re-derives that record on every run.
 
 Two things are deliberately unfinished and named rather than implied: RFC 3161 anchors
-(section 8) and the `text-v1` fingerprint (section 9). `docs/CONFORMANCE.md` lists them
-alongside what each would take.
+(section 8) and the comparison of a receipt with the page as it is now (section 9).
+`docs/CONFORMANCE.md` lists them alongside what each would take.
 
 ## 1. Scope
 
@@ -246,6 +246,87 @@ Two rules fall out of that, and they are worth stating because they constrain wh
 2. **A field whose meaning a verifier cannot check is reported, and named as uncontrolled.** That is
    what the verdict's `capture` block is for - it is information for a reader, not evidence of anything.
 
+## 4.5 `subject.text`: the words, and the `text-v1` fingerprint
+
+```json
+"subject": {
+  "url": "https://example.org/a-page-worth-citing",
+  "document": { "sha256": "…", "bytes": 1234 },
+  "text": { "normalization": "text-v1", "sha256": "…" }
+}
+```
+
+`text` is optional, and it answers a question a document digest cannot: **did the words change?** A page
+can be served in two byte-different ways that say the same thing - a timestamp in a footer, a rotated
+nonce, a re-ordered attribute - and a page can be re-served byte-identically while its meaning is
+replaced by a script. The fingerprint makes the first case answerable and the second one visible.
+
+The fingerprint is the SHA-256 of the extracted text, as UTF-8, with no trailing newline. It is
+**derived, never supplied**: a producer computes it from the same bytes it digested for
+`subject.document`, and a producer that cannot extract text **MUST** omit the field rather than
+fingerprint something else.
+
+### 4.5.1 The extraction, stated as rules
+
+This is the normative definition. It is a deterministic walk over the document's **bytes** - not over a
+rendered layout, and not `innerText`, which depends on layout, differs between engines, and returns
+nothing at all for a detached document.
+
+1. **Text.** A text node contributes its characters, with character references decoded.
+2. **Block elements end a line.** Before and after each of: `address`, `article`, `aside`, `blockquote`,
+   `br`, `dd`, `div`, `dl`, `dt`, `fieldset`, `figcaption`, `figure`, `footer`, `form`, `h1`-`h6`,
+   `header`, `hr`, `li`, `main`, `nav`, `ol`, `p`, `pre`, `section`, `table`, `tbody`, `td`, `tfoot`,
+   `th`, `thead`, `tr`, `ul`. Everything else is inline and joins its neighbours.
+3. **These elements are not read, nor is anything inside them:** `script`, `style`, `noscript`,
+   `template`, `head`, `title`, `meta`, `link`, `svg`, `canvas`, `iframe`, `object`, `embed`, `audio`,
+   `video`.
+4. **Neither is anything inside an element that asks not to be read:** one with a `hidden` attribute, one
+   with `aria-hidden="true"`, or one whose `style` attribute contains `display:none` or
+   `visibility:hidden`. Only the element's own attributes count (see 4.5.4).
+5. **A line is collapsed and trimmed.** Interior runs of whitespace become one space; a line that is
+   empty is not emitted. Lines are joined with `\n`.
+6. **Character references** - named, decimal and hexadecimal - become their characters. A reference that
+   cannot be a character is left exactly as written, because a substitution a second implementation
+   cannot reproduce is not a fingerprint.
+7. **Malformed markup degrades in defined ways.** A `<` that does not begin a tag is text. A tag inside
+   `script`, `style`, `title` or `textarea` is content, not markup. An end tag with no matching start is
+   ignored. An unterminated tag ends the document.
+
+### 4.5.2 Why it is defined over bytes
+
+Shelf's `extractText` is where these rules come from (D-009), and it remains the implementation they were
+taken from. What changed when they were written down is the input: a verifier holding a capture has bytes
+and no DOM. That has two consequences, and both are the point.
+
+- **Two runtimes cannot disagree.** A command line and a browser run the same walk over the same bytes,
+  so a receipt checked in either reports the same thing - rather than one reporting `pass` and the other
+  `not_checked`, which is two answers to one question.
+- **A fingerprint is reproducible from this document.** An implementation that follows these rules and no
+  others gets the same digest, including for the malformed markup a crawler fetched rather than a browser
+  serialised.
+
+### 4.5.3 What this check proves, and what it does not
+
+`subject.text` in L3 holds up when the words re-extracted from the capture hash to what the claim says. It
+catches a producer whose extractor disagreed with this definition, and a claim that describes words the
+capture does not contain. It does **not** say the page still says them: that needs a request, which a
+verifier does not make. Comparing a receipt with the page **now** is a separate act with a separate
+report, and it **MUST NOT** be folded into `verified` (section 7.5).
+
+### 4.5.4 What it deliberately does not do
+
+No layout, no cascade: a `display:none` in a stylesheet is invisible to this walk, and so is content
+hidden by a class. No browser error recovery, and no full HTML5 entity table - an unknown named entity
+stays as written, and an out-of-range character reference is not replaced with `U+FFFD`. No
+re-derivation of `subject.document` from the capture: the check above re-reads the document, and does not
+compare that document with the document digest. Section 9 records that gap in the list of things a
+verifier in 0.1 does not do, because the asymmetry is easy to assume away.
+
+A producer that needs any of those - a browser extension extracting from a live DOM, say - **MAY** extract
+however it likes, but a fingerprint it writes is only checkable against the capture if it was produced by
+the rules above. That is the trade this section makes in exchange for a fingerprint that means the same
+thing everywhere.
+
 ## 5. Canonical form: `canonical-json-v1`
 
 The signed material is a *byte string*, so it needs exactly one spelling. This is that
@@ -434,7 +515,7 @@ forgotten in the code fails a test rather than disappearing from every report.
 | **L0** | integrity | Are these the bytes this receipt names? |
 | **L1** | attribution | Did the named key sign this claim? |
 | **L2** | time | Did anything other than the author attest that this claim existed? |
-| **L3** | currency | Does the page still match, as of now? |
+| **L3** | currency | Are the words in the capture the words the claim fingerprints? |
 
 A level is `pass` **only when every check in it is `pass`** - no exceptions and no "pass with
 warnings". A level whose checks are a mix of `pass` and `not_checked` is `not_checked`, because
@@ -464,7 +545,7 @@ the moment a partially examined level can print as verified, the level stops mea
 | `signature.verify` | L1 | The signature verifies over `vidimus/claim/<version>:<claim_hash>`. |
 | `anchor.present` | L2 | The claim carries an anchor, and its type is one this verifier knows. |
 | `anchor.verified` | L2 | The anchor checks out (section 8). |
-| `subject.text` | L3 | The `text-v1` fingerprint matches its definition. |
+| `subject.text` | L3 | The `text-v1` fingerprint is the fingerprint of the words in the capture, re-extracted from the capture's own document by the procedure in section 4.5. Whether the page still says those words needs a request, and is not this check. |
 
 `capture.wacz.resources` sits in L0 rather than being left to the WACZ ecosystem because it is
 the part of the capture that is *self-describing*. Without it, the container digest says only
@@ -602,8 +683,8 @@ a limitation somebody will assume away.
 | --- | --- | --- |
 | Full WACZ validation | `capture.wacz.*` | The receipt layer depends on the container's own resource hashes, not on re-implementing the WACZ specification. Use `py-wacz` or the Webrecorder tooling for that. |
 | WARC parsing, and re-deriving `subject.document` | no check; the **producer** does it | A half-parser that disagrees with a real one reports a *false change*, which is worse than reporting no change. The producer must derive it and refuse when it cannot (section 4.2, D-016). |
-| Whether a capture holds the wire bytes or the rendered document | a field that does not exist yet | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. Nothing in the claim says which kind of capture it is, and a verifier cannot tell them apart. Section 13 proposes the field that would fix it, and this row exists so that the gap is named rather than assumed away. |
-| `text-v1` | `subject.text` | Defined over a rendered document - the same deterministic DOM walk Shelf performs when it indexes a page - and the reference verifier has no HTML engine. It reports `not_checked` and says why (D-009). |
+| Comparing that re-read document with `subject.document.sha256` | no check | The verifier re-reads a capture's document to check the text fingerprint (section 4.5), and does not compare it with the document digest the claim states. So a claim whose `subject.document` described a *different* document would still verify on integrity: what L0 establishes is "these are the bytes this receipt names", not "this claim describes them". A candidate check for 0.2, named here rather than assumed away. |
+| Whether a capture holds the wire bytes or the rendered document | `capture.profile` (section 4.4) | A Manifest V3 extension cannot read the body of a response the page made, so a browser capture holds the document **as rendered**. A claim now says which kind of capture it holds, and a verifier reports what it declared without judging it: what a capture holds cannot be worked out from its bytes, which is why the field exists. |
 | RFC 3161 token validation | `anchor.verified` | Section 8.3. The check reports `unsupported`, never `pass`. |
 | Level 3 (currency) | a comparison that is not yet specified | It needs the network, and this verifier makes no network requests by design. A **caller** that wants L3 performs the fetch itself and reports the result separately; it **MUST NOT** be folded into `verified`. |
 | Key directories and trust roots | `signature.*` | Untrusting a key is a policy decision, and a format that hard-codes trust roots is a format that rots. The verdict reports `key_trusted` from a list the caller supplies (D-007). |

@@ -119,17 +119,17 @@ test('every check has been seen not passing at least once', async () => {
   assert.deepEqual(never, [], 'a check that has never been seen failing is not a check');
 });
 
-test('each level reaches a pass somewhere, except the one this verifier cannot check', async () => {
+test('each level reaches a pass somewhere', async () => {
   const passes = new Set();
   for (const { verdict } of built) {
     for (const level of LEVELS) {
       if (verdict.levels[level.id].status === 'pass') passes.add(level.id);
     }
   }
-  assert.deepEqual([...passes].sort(), ['L0', 'L1', 'L2']);
-  // L3 is absent by design: `text-v1` is defined over a rendered document and this verifier
-  // has no HTML engine. `docs/CONFORMANCE.md` records it as the known gap, and the day an
-  // L3 pass appears here is the day that document is out of date.
+  // L3 used to be absent from this list, because `subject.text` was defined over a rendered document and
+  // this verifier had no HTML engine. It is defined over bytes now (section 9.2 of the specification), so
+  // all four levels reach a pass - and `docs/CONFORMANCE.md` records the change.
+  assert.deepEqual([...passes].sort(), ['L0', 'L1', 'L2', 'L3']);
 });
 
 test('the summary never says a level is verified unless it is', async () => {

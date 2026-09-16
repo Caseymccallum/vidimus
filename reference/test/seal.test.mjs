@@ -14,7 +14,7 @@ import { verifyReceipt } from '../src/verify-node.mjs';
 import { DEFAULT_HTML, DEFAULT_URL, signer, waczBytes, waczEntries, warcRecord } from '../src/fixtures.mjs';
 import { canonicalise } from '../src/canonical.mjs';
 import { sha256, utf8 } from '../src/digest.mjs';
-import { decompress, isGzipped } from '../src/warc.mjs';
+import { decompress, isGzipped } from '../src/warc-node.mjs';
 import { storeGzip } from '../src/gzip.mjs';
 
 const text = (value) => Buffer.from(value).toString('utf8');

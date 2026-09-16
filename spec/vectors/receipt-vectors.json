@@ -360,11 +360,11 @@
     },
     {
       "id": "valid-with-text",
-      "description": "a receipt that declares a text fingerprint",
-      "proves": "this verifier says it did not check the fingerprint instead of implying it did",
+      "description": "a receipt that declares a text fingerprint the capture actually has",
+      "proves": "a fingerprint is checked rather than caveated: the words are re-extracted from the capture and hashed, so this level can pass - and a producer whose extractor disagreed with the definition is caught",
       "fixture": {
         "file": "valid-with-text.receipt",
-        "sha256": "6ce8deea4f27755368433692ceb6fb1152f00102c275fd344598678d7b75dd0c",
+        "sha256": "3fc8915bdf6f88b2e2ae8a8a9dea7d4d80f51faca4b62822753d584f3f4ae261",
         "bytes": 2334
       },
       "options": {},
@@ -375,33 +375,79 @@
           "L0": "pass",
           "L1": "pass",
           "L2": "not_checked",
-          "L3": "not_checked"
+          "L3": "pass"
         },
         "checks": {
-          "subject.text": "not_checked"
+          "subject.text": "pass"
         }
       },
       "verdict": {
         "verified": true,
         "exit_code": 0,
-        "claim_hash": "9f52ada2d2cd3217ce1dda8cec3926a4874c08a00da0ab856f9d2123286822a6",
+        "claim_hash": "1edf0ea3e23aac4180984dee212a048ff1d7ba04b5eb18297ac058c0a4d5d75d",
         "capture_profile": null,
         "levels": {
           "L0": "pass",
           "L1": "pass",
           "L2": "not_checked",
-          "L3": "not_checked"
+          "L3": "pass"
         },
         "attribution": {
           "status": "valid",
           "key_trusted": "not_checked"
         },
         "time_bound": "claimed_only",
-        "caveat_count": 2,
+        "caveat_count": 1,
+        "checks": {
+          "anchor.present": "not_applicable",
+          "anchor.verified": "not_checked"
+        }
+      }
+    },
+    {
+      "id": "text-fingerprint-wrong",
+      "description": "a receipt whose text fingerprint is not the words in its own capture",
+      "proves": "the fingerprint is checked against the capture, so a claim that says the page said something it did not is a failure - this is the shape of the bug this project's own fixture had, found by the check the fixture made necessary",
+      "fixture": {
+        "file": "text-fingerprint-wrong.receipt",
+        "sha256": "6ce8deea4f27755368433692ceb6fb1152f00102c275fd344598678d7b75dd0c",
+        "bytes": 2334
+      },
+      "options": {},
+      "expect": {
+        "verified": false,
+        "exit_code": 2,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "fail"
+        },
+        "checks": {
+          "subject.text": "fail"
+        }
+      },
+      "verdict": {
+        "verified": false,
+        "exit_code": 2,
+        "claim_hash": "9f52ada2d2cd3217ce1dda8cec3926a4874c08a00da0ab856f9d2123286822a6",
+        "capture_profile": null,
+        "levels": {
+          "L0": "pass",
+          "L1": "pass",
+          "L2": "not_checked",
+          "L3": "fail"
+        },
+        "attribution": {
+          "status": "valid",
+          "key_trusted": "not_checked"
+        },
+        "time_bound": "claimed_only",
+        "caveat_count": 1,
         "checks": {
           "anchor.present": "not_applicable",
           "anchor.verified": "not_checked",
-          "subject.text": "not_checked"
+          "subject.text": "fail"
         }
       }
     },

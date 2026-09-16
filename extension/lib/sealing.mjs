@@ -21,6 +21,7 @@
 
 import { buildCapture } from '../../reference/src/capture.mjs';
 import { draftClaim, finishClaim } from '../../reference/src/claim.mjs';
+import { textDigest } from '../../reference/src/text.mjs';
 import { signClaim } from './keys.mjs';
 
 /**
@@ -75,6 +76,9 @@ export async function sealPage(input) {
     contentType: facts.contentType ?? null,
     capturedAt: facts.capturedAt,
     document: capture.document,
+    // The same fingerprint the command line's producer writes, from the same bytes: a receipt's provenance
+    // should not depend on which producer made it.
+    text: { sha256: textDigest(facts.html) },
     captureProfile: capture.profile,
     anchor: input.anchor,
   });

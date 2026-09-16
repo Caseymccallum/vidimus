@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { CaptureError, buildCapture, buildWarcRecord } from '../src/capture.mjs';
 import { findCaptureWarc, sealFromCapture } from '../src/seal.mjs';
-import { findMainDocument } from '../src/warc.mjs';
+import { findMainDocument } from '../src/warc-node.mjs';
 import { verifyReceipt } from '../src/verify-node.mjs';
 import { signer } from '../src/fixtures.mjs';
 import { sha256 } from '../src/digest.mjs';
