@@ -10,8 +10,15 @@ worth more than any amount of additional code.
 
 1. **A second implementation.** Another language reading
    [`spec/vectors/receipt-vectors.json`](spec/vectors/receipt-vectors.json) would turn "the reference
-   implementation agrees with itself" into corroboration. This is the biggest single gap (see
-   `docs/CONFORMANCE.md`, section 6).
+   implementation agrees with itself" into corroboration. The fixtures ship with the vectors, so this does
+   not start with reimplementing anybody's fixture builder:
+
+   ```bash
+   node reference/src/vectors.mjs --emit ./kit   # 41 fixtures, the answers, and what to do with them
+   ```
+
+   The recorded answers are statuses and not prose, so an implementation that disagrees with every word of
+   our reasons is still conformant. This is the biggest single gap (see `docs/CONFORMANCE.md`, section 1).
 2. **Token validation against a real authority.** Section 8.3 is implemented (`rfc3161.mjs`) and validated
    against a TSA certificate the caller pins. What nobody has tried yet is a token from a real timestamping
    authority: a certificate whose key is a chain rather than a pin, which is where the refusal to build
@@ -56,7 +63,7 @@ worth more than any amount of additional code.
 npm run verify                              # what CI runs: everything below, in order
 npm run syntax                              # every module parses
 npm run check:language                      # British English, enforced
-npm test                                    # 160 tests, no install
+npm test                                    # 164 tests, no install
 npm run check:docs                          # the counts the documentation quotes are real
 npm run vectors:generate                    # rebuild the fixtures to look at one
 node reference/src/cli.mjs verify spec/fixtures/capture-digest-mismatch.receipt

@@ -1,8 +1,10 @@
 /**
  * Generate, assert and check the conformance vectors.
  *
- *   node reference/src/vectors.mjs --write    # record (or re-record) the vectors
- *   node reference/src/vectors.mjs --check    # prove the implementation still matches
+ *   node reference/src/vectors.mjs --write            # record (or re-record) the vectors
+ *   node reference/src/vectors.mjs --check            # prove the implementation still matches
+ *   node reference/src/vectors.mjs --emit <dir>       # a kit another implementation can check
+ *   node reference/src/vectors.mjs --check-kit <dir>  # check a kit, fixture by fixture
  *
  * `--check` is what runs in CI and in `npm run verify`. It rebuilds every fixture from its
  * recipe in memory and compares the resulting verdict against the committed file, field
@@ -14,6 +16,14 @@
  * the vectors are the record, and rebuilding them is the point. A recorded digest over a
  * fixture that is generated from a published recipe catches everything a committed blob
  * would, and stays reviewable in a diff.
+ *
+ * **But a recipe in this repository is not a kit.** A second implementer cannot check a
+ * digest they have no file for, and telling them to rebuild it means telling them to
+ * reimplement `fixtures.mjs` before they can write a line of their own reader - which is
+ * the opposite of what a conformance suite is for. So `--emit` writes the fixtures, the
+ * expectations and the instructions to a directory, and `--check-kit` checks such a
+ * directory without rebuilding anything: the same code path a stranger would take, run
+ * here so that it cannot rot (D-031).
  *
  * @module vectors
  */
@@ -68,6 +78,10 @@ function expectationProblems(id, verdict, expect) {
 /**
  * The part of a verdict worth recording: statuses, not prose.
  *
+ * Exported because it is *the* definition of what a recorded verdict contains - the recorder writes it, and
+ * `--check-kit` compares against it, so a kit checked by somebody else and a kit recorded here cannot
+ * disagree about which fields count.
+ *
  * Reasons are deliberately excluded. A vector that fails when someone improves a
  * sentence teaches people to re-record vectors without reading them, and the moment that
  * habit forms the vectors stop being evidence. That the reasons exist and are specific is
@@ -76,7 +90,7 @@ function expectationProblems(id, verdict, expect) {
  * @param {ReturnType<typeof verifyReceipt>} verdict
  * @returns {Record<string, any>}
  */
-function record(verdict) {
+export function verdictRecord(verdict) {
   const checks = {};
   for (const check of verdict.checks) {
     if (check.status !== 'pass') checks[check.id] = check.status;
@@ -142,7 +156,7 @@ export async function buildVectors() {
       fixture: { file, sha256: sha256(bytes), bytes: bytes.length },
       options: testCase.options ?? {},
       expect: testCase.expect,
-      verdict: record(verdict),
+      verdict: verdictRecord(verdict),
     });
   }
 
@@ -209,6 +223,64 @@ export function differences(expected, actual, path = '') {
 }
 
 /**
+ * Check a conformance kit: fixtures from disk, answers from the record beside them.
+ *
+ * This is the code path a stranger takes, run here so that it cannot rot. Nothing is rebuilt: the fixture
+ * file is read, hashed against the kit's own record, verified, and compared with the verdict the kit
+ * promises. If `--emit` and this ever disagree, one of them is wrong and `npm run verify` says which.
+ *
+ * @param {string} directory
+ * @returns {Promise<number>}
+ */
+export async function checkKit(directory) {
+  let kit;
+  try {
+    kit = JSON.parse(readFileSync(join(directory, 'receipt-vectors.json'), 'utf8'));
+  } catch (error) {
+    console.error(`${directory}: could not be read as a conformance kit: ${error.message}`);
+    return 2;
+  }
+
+  const problems = [];
+  for (const vector of kit.vectors ?? []) {
+    const path = join(directory, 'fixtures', vector.fixture?.file ?? '');
+    let bytes;
+    try {
+      bytes = readFileSync(path);
+    } catch (error) {
+      problems.push(`${vector.id}: ${vector.fixture?.file}: ${error.message}`);
+      continue;
+    }
+
+    const digest = sha256(bytes);
+    if (digest !== vector.fixture.sha256) {
+      problems.push(
+        `${vector.id}: the fixture hashes to ${digest}, and the kit says ${vector.fixture.sha256}`,
+      );
+      continue;
+    }
+
+    const verdict = await verifyReceipt(new Uint8Array(bytes), vector.options ?? {});
+    for (const line of differences(vector.verdict, verdictRecord(verdict))) {
+      problems.push(`${vector.id}: ${line}`);
+    }
+  }
+
+  if (problems.length > 0) {
+    console.error(`${directory}: ${problems.length} answers do not match the kit's own record:`);
+    for (const line of problems.slice(0, 30)) console.error(`  - ${line}`);
+    return 1;
+  }
+
+  console.log(
+    `kit: ${kit.vectors.length} fixtures read from ${directory}, hashed, and answered as recorded`,
+  );
+  return 0;
+}
+
+/**
+ * Every difference between a document and another, as paths.
+ *
  * @param {Record<string, any>} committed
  * @param {Record<string, any>} computed
  * @returns {string[]}
@@ -216,6 +288,73 @@ export function differences(expected, actual, path = '') {
 export function compareDocument(committed, computed) {
   return differences(committed, computed);
 }
+
+/**
+ * What a kit tells whoever receives it.
+ *
+ * Written into the kit rather than left in this repository, because the whole point is that nobody needs
+ * this repository: a README that says what to do is the difference between a conformance suite and a pile
+ * of files with surprising names.
+ *
+ * @param {Record<string, any>} document
+ * @param {number} fixtureCount
+ * @returns {string}
+ */
+export function kitReadme(document, fixtureCount) {
+  return [
+    '# Receipt conformance kit',
+    '',
+    `The machinery of \`docs/RECEIPT-SPEC.md\` section 11: ${fixtureCount} fixtures, the verdict each one must`,
+    "produce, and nothing that needs this project's code.",
+    '',
+    '## Three steps, in any language',
+    '',
+    '1. For each entry in `receipt-vectors.json`, read `fixtures/<fixture.file>` and check that its SHA-256',
+    '   is `fixture.sha256`. If it is not, stop: you are not checking the file these answers came from.',
+    '2. Verify that receipt, applying the rules of section 7 of the specification.',
+    "3. Compare your verdict with that entry's `verdict`, field by field.",
+    '',
+    '`verdict` records statuses rather than prose: `verified`, `exit_code`, the claim hash, the capture',
+    'profile, the level rollups, attribution, the time bound, a caveat count, and a status for every check',
+    'that is not a `pass`. Reasons are deliberately excluded, so improving a sentence is not a conformance',
+    'failure - and neither is disagreeing with one.',
+    '',
+    '`options` is what the verdict was produced with. `trustedKeys`, `keyDirectory`, `trustedTsa` and',
+    "`previousClaimHash` are the caller's configuration, and a conformance run has to supply them.",
+    '',
+    '## What is not in here',
+    '',
+    'The captures inside those receipts are fixture data: small, deterministic, and not real pages. What is',
+    'being checked is the *rules*, not anybody\'s capture.',
+    '',
+    `Produced by vidimus verifier ${document.verifier_version} for specification ${document.spec_version}.`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Write a conformance kit: the fixtures, the answers, and what to do with them.
+ *
+ * The fixtures go to disk here and nowhere else. They are not committed to this repository, because they
+ * are regenerable from `fixtures.mjs` - and that is exactly what makes them useless to somebody who does not
+ * have this repository, which is the audience a conformance suite exists for (D-031).
+ *
+ * @param {string} directory
+ * @param {Record<string, any>} document
+ * @param {Map<string, Uint8Array>} fixtures
+ * @returns {number}
+ */
+export function emitKit(directory, document, fixtures) {
+  mkdirSync(join(directory, 'fixtures'), { recursive: true });
+  writeFileSync(join(directory, 'receipt-vectors.json'), `${JSON.stringify(document, null, 2)}\n`);
+  writeFileSync(join(directory, 'README.md'), kitReadme(document, fixtures.size));
+  for (const [file, bytes] of fixtures) writeFileSync(join(directory, 'fixtures', file), bytes);
+
+  console.log(`emitted ${fixtures.size} fixtures and ${document.vectors.length} answers to ${directory}`);
+  console.log(`  ${join(directory, 'README.md')} says what to do with them`);
+  return 0;
+}
+
 
 /** @param {string} file @param {Uint8Array} bytes */
 function writeFixture(file, bytes) {
@@ -231,6 +370,25 @@ function main() {
 /** @returns {Promise<void>} */
 async function mainAsync() {
   const mode = process.argv[2];
+  const target = process.argv[3];
+
+  // Two modes that do not rebuild this repository's fixtures. A kit is *files*, and checking one is the code
+  // path a stranger takes - so neither should depend on the code that generated them.
+  if (mode === '--check-kit') {
+    if (target === undefined) {
+      console.error('usage: node reference/src/vectors.mjs --check-kit <directory>');
+      process.exitCode = 2;
+      return;
+    }
+    process.exitCode = await checkKit(target);
+    return;
+  }
+  if (mode === '--emit' && target === undefined) {
+    console.error('usage: node reference/src/vectors.mjs --emit <directory>');
+    process.exitCode = 2;
+    return;
+  }
+
   const { document, fixtures, problems } = await buildVectors();
 
   if (problems.length > 0) {
@@ -273,7 +431,12 @@ async function mainAsync() {
     return;
   }
 
-  console.error('usage: node reference/src/vectors.mjs --write | --check');
+  if (mode === '--emit') {
+    process.exitCode = emitKit(target, document, fixtures);
+    return;
+  }
+
+  console.error('usage: node reference/src/vectors.mjs --write | --check | --emit <dir> | --check-kit <dir>');
   process.exitCode = 2;
 }
 

@@ -875,6 +875,17 @@ recipe in `reference/src/fixtures.mjs`, so a reader can rebuild it and compare, 
 stays small enough to review in a diff. `node reference/src/vectors.mjs --check` performs
 exactly that comparison, and `npm run verify` runs it as part of the repository's own gate.
 
+**A recipe is not a kit.** An implementation written by somebody who does not have this repository cannot
+check a digest they cannot produce the file for, so the fixtures can also be written *out*:
+
+```bash
+node reference/src/vectors.mjs --emit ./kit     # the fixtures, the answers, and what to do with them
+```
+
+That directory is self-contained: 41 `.receipt` fixtures, `receipt-vectors.json`, and a README naming the
+three steps - check each fixture against its recorded digest, verify it, compare the statuses. Nothing in
+it needs this project's code, and `--check-kit` runs that same path here so that it cannot rot.
+
 Listing an implementation here means opening a pull request containing its results against the
 vectors. That is a claim about agreement, not about quality: two implementations can conform and
 still disagree about everything a user cares about.

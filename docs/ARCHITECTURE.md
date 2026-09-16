@@ -642,6 +642,31 @@ omitting the option rather than passing an infinite one. Two existing tests caug
 they read real DEFLATE archives written by other tools - which is the argument for having vectors made of
 somebody else's output rather than only your own.
 
+### D-031 - The vectors ship as a kit, so a second implementation need not rebuild ours
+
+The conformance vectors have always recorded each fixture's SHA-256, and the fixtures have never been
+committed: they are generated from a recipe in `fixtures.mjs`, and the recipes are the record (D-014). That
+is right for *this* repository and useless to a stranger, which is the only audience a conformance suite
+has. A digest nobody can produce the file for is not evidence of anything, and the alternative on offer was
+"reimplement our fixture builder before writing a line of your own reader" - which is a test suite that
+tests nothing about the reader.
+
+So `--emit <dir>` writes a **kit**: the 41 fixtures, the answers, and a README that says what to do with
+them. Three decisions inside that:
+
+1. **The kit carries the committed record byte for byte.** A kit that described answers the repository does
+   not hold would be a second source of truth, and this project has spent a lot of effort having none.
+2. **`--check-kit <dir>` exists to run a stranger's path here.** It reads the fixtures from disk, hashes them
+   against the kit's own record, verifies them and compares against the promised verdicts - rebuilding
+   nothing. Without it, the emit path would be the one code path in the repository with no test, and it
+   would rot in the usual way: quietly, and in the direction of being believed.
+3. **The kit is not committed.** Emitting on demand costs one command, and committing 41 binaries so that
+   they can drift against the recipes that generate them would trade a real guarantee for a convenience.
+
+What the kit deliberately excludes is as much the point: reasons, prose and the `expect` field stay behind,
+because they are documentation of *why*, and a second implementation should be free to disagree with the
+wording. What it must not be free to disagree with is which check reported what.
+
 ## 3. What this implementation deliberately does not have
 
 - **A JSON Schema for the claim.** `validateManifestShape` is the normative shape check, in code,

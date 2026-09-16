@@ -9,7 +9,7 @@
 [![Spec licence: CC BY 4.0](https://img.shields.io/badge/spec%20licence-CC%20BY%204.0-8A8A8A)](docs/RECEIPT-SPEC.md)
 [![Node.js](https://img.shields.io/badge/node-22%2B-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-3DA639)](#verify-the-claims-yourself)
-[![Tests](https://img.shields.io/badge/tests-160-3DA639)](#verify-the-claims-yourself)
+[![Tests](https://img.shields.io/badge/tests-164-3DA639)](#verify-the-claims-yourself)
 [![Vectors](https://img.shields.io/badge/vectors-41-3DA639)](spec/vectors/receipt-vectors.json)
 [![verify](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml/badge.svg)](https://github.com/Caseymccallum/vidimus/actions/workflows/verify.yml)
 
@@ -53,7 +53,7 @@ both facts true, both reported, neither hidden behind the other.
 > one is to misread.
 
 > **⚠️ Early, and deliberately so.** 0.1.0 is the specification, a reference verifier, a producer and a
-> browser extension: 160 tests, 41 conformance vectors, no dependencies. The format is checkable and is
+> browser extension: 164 tests, 41 conformance vectors, no dependencies. The format is checkable and is
 > being checked; what it cannot do is listed in [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) rather than
 > left to be discovered.
 
@@ -211,7 +211,8 @@ here because a format that cannot say what it grew out of is a format nobody can
 
 - **A second implementation.** The conformance vectors pin one implementation's answers, which is
   agreement rather than corroboration, and a second reading of the same vectors is the biggest single
-  gap. `CONTRIBUTING.md` says so first.
+  gap. The fixtures ship for it: `node reference/src/vectors.mjs --emit ./kit` writes 41 receipts, the
+  verdict each one must produce, and a README with the three steps (D-031).
 - **Re-deriving `subject.document` from the capture.** The verifier re-reads a capture's document to
   check the text fingerprint and does not compare it with the document digest the claim states
   (section 9 of the specification).

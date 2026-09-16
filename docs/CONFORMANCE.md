@@ -16,6 +16,18 @@ An implementation conforms to Receipt 0.1.0 when it satisfies section 11 of
 The reference implementation's own conformance is not asserted anywhere. It is re-derived on every
 run, by rebuilding every fixture and comparing the answer to the record.
 
+**Before any of that, get the fixtures.** They are not committed to this repository, because they are
+regenerable from a recipe - and a recipe is not a kit, so there is a command that writes one:
+
+```bash
+node reference/src/vectors.mjs --emit ./kit
+```
+
+`./kit` holds the 41 fixtures, `receipt-vectors.json`, and a README with the three steps: check each fixture
+against its recorded digest, verify it, compare the statuses. Nothing in it requires this repository's code.
+Believing a conformance suite without checking a fixture's digest first is the failure mode the digest is
+there to prevent.
+
 ## 2. Running the gate
 
 ```bash
@@ -26,9 +38,11 @@ npm run verify      # syntax, then tests, then the vectors
 | --- | --- |
 | `npm run syntax` | Every `.mjs` module in the repository parses. Stands in for the type check this project deliberately does without (D-002). |
 | `npm run check:language` | The prose, comments and identifiers are British English (`scripts/check-language.mjs`). |
-| `npm test` | 160 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
+| `npm test` | 164 tests: the canonical form's rules, the container reader, the text fingerprint's rules, the verifier's invariants, and the vectors. |
 | `npm run check:docs` | Every count the documentation quotes - tests, vectors, fixtures, checks - matches reality. It re-runs the suite to read the count, so `npm run verify` runs the tests twice; that is one second, and it buys numbers that cannot go stale. |
 | `npm run vectors:check` | Every fixture rebuilds to its recorded digest, and every verdict equals its recorded answer. |
+| `node reference/src/vectors.mjs --emit <dir>` | Writes a conformance kit: the fixtures, the answers and a README saying what to do with them. Nothing in it needs this repository. |
+| `node reference/src/vectors.mjs --check-kit <dir>` | Checks a kit the way a stranger would - files from disk, hashed against the kit's own record - so that the emit path cannot rot unchecked. |
 | `node reference/src/cli.mjs verify <file>` | The same verifier from the command line, with a readable summary and a three-state exit code. `--trusted-key`, `--key-directory` and `--tsa` are how a caller answers "whose key signed this?" and "whose timestamp is this?" (sections 6.7 and 8.3 of the specification). |
 | `node reference/src/cli.mjs keys <directory.json>` | Reads a key directory and says what is in it, refusing the entries it will not use rather than waiting for a receipt to fail against them. |
 | `node reference/src/cli.mjs check <file>` | The comparison with the page as it is now: the only command that makes a request, and the only one whose output includes a currency report. `--require-same-words` makes that report, rather than the receipt, decide the exit code. |
