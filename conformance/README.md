@@ -78,6 +78,10 @@ text fingerprint and its `not_applicable` when a claim carries none, and both th
 of the claim checks. A conformance run that only ever saw the happy path would agree with a reference that did
 nothing.
 
+The verdict fields are covered the same way: nine distinct combinations of `attribution`, `time_bound` and
+`capture_profile` across the fixtures, including a key the caller vouches for, one it does not, an anchor that
+verified and three declared capture profiles - and all three exit codes.
+
 ## What writing it found
 
 Nine things that only showed up when somebody implemented the format somewhere else. Six are fixed in the
@@ -178,22 +182,21 @@ second implementer can follow without asking anybody anything.
 
 ## What this is not
 
-**It is not offered as a conforming implementation yet, and the reason is now narrow enough to be exact.**
-Section 11 says a conformance run compares the verdict "field by field". Of the nine fields the record
-carries, this compares five: `claim_hash`, `checks`, `levels`, `verified` and `exit_code`. It does not produce
-four:
+**It is not offered as a conforming implementation yet, and the reason is now one field wide.** Section 11 says
+a conformance run compares the verdict "field by field". Of the nine fields the record carries, this compares
+eight: `claim_hash`, `checks`, `levels`, `verified`, `exit_code`, `capture_profile`, `attribution` and
+`time_bound` - the last three agreeing across all nine distinct combinations the 48 fixtures contain, including
+a trusted key, an untrusted one, a verified anchor and three declared capture profiles. One field is left:
 
-- **`capture_profile`** — the declared profile and whether this verifier understands it (section 4.4);
-- **`attribution`** — the self-asserted `signer` name and whether a caller-supplied key directory vouches for
-  the key (section 6.7);
-- **`time_bound`** — `claimed_only`, or `attested_before` with the instant an anchor attests (section 8.4);
-- **`caveat_count`** — and this one is the interesting one. Every other field is a *rule* that can be
-  implemented from the specification; a caveat count is a number that depends on how many prose caveats the
-  implementation chose to raise, at every point where something was not checked. Two verifiers that agree on
-  all 21 checks, all four levels and `verified` can still disagree about this number, and neither of them is
-  wrong. A count is a strange thing to make conformant, and it is worth deciding whether section 11 should
-  ask for it.
+- **`caveat_count`** — and it is left because it is not obvious that it should be compared at all. Every other
+  field is a *rule*: `verified` follows from the levels, `attribution.status` from one check, `time_bound` from
+  another. A caveat count is a number that depends on how many prose caveats an implementation chose to raise
+  at every point where something was not checked. Two verifiers that agree on all 21 checks, all four levels,
+  `verified`, `exit_code`, `capture_profile`, `attribution` and `time_bound` can still disagree about it, and
+  neither of them is wrong. A count is a strange thing to make conformant, and it is worth deciding whether
+  section 11 should ask for it - which is a question about the specification rather than a task in this
+  directory.
 
-The first three are small. The fourth is the reason this directory still says "evidence that the rules are
-implementable from the specification by somebody who did not write it" rather than "a conforming
-implementation".
+So this directory is still better described as evidence that the *rules* are implementable from the
+specification by somebody who did not write it than as a conforming implementation. The difference is one
+number whose conformability is itself in question.

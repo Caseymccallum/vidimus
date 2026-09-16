@@ -739,8 +739,9 @@ Three decisions about how it was done, which matter more than what it covered:
    6.1. Where the two disagreed, the disagreement was the finding rather than something to silently match -
    and there were three of them, all now fixed in the specification (below).
 2. **One layer at a time, complete, and named as partial.** It implements all 21 checks of section 7.4 and
-   says so in its own output; `conformance/README.md` states that it must not be listed as a conforming
-   implementation until it assembles a whole verdict. A second implementation that quietly covered half the
+   compares eight of the nine verdict fields, and says so in its own output; `conformance/README.md` states
+   that it must not be listed as a conforming implementation while the ninth - a caveat count, which it argues
+   may not belong in section 11 at all - is missing. A second implementation that quietly covered half the
    table would be worse than none, because "agreement" would then mean less than it sounds like.
 3. **It reports what it did not reach, by name.** Four vectors stop at a gate (a fixture that is not a
    container, a claim that does not parse, an unknown `spec_version`), and two are refused. Those are

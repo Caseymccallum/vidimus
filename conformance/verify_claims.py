@@ -435,16 +435,21 @@ def check_vector(kit: Path, vector: dict) -> tuple[list[str], str]:
         )
 
     statuses: dict[str, str] = {}
+    # Bound before the stages that may not reach them, so the rollup can be computed on every path out -
+    # including the ones where no claim was ever parsed (`manifest is None`).
+    manifest: dict | None = None
 
     def report(statuses: dict) -> tuple[list[str], str]:
-        """Everything this implementation can compare for this vector: the checks and the rollup.
+        """Everything this implementation can compare for this vector: the checks and the verdict.
 
         Defined before it is used, which sounds too obvious to say until a nested function is called from a
         branch above its definition - which is exactly what happened here on the first attempt.
         """
         filled = fill(statuses)
         problems = compare(filled, checks)
-        problems.extend(compare_verdict(filled, vector.get("verdict") or {}))
+        problems.extend(compare_verdict(
+            filled, vector.get("verdict") or {}, rollup_fields(manifest, options, filled),
+        ))
         return (problems, _outcome(statuses, checks))
 
     # 1. The container, whose entry names reach a filesystem call in every consumer.
@@ -605,15 +610,70 @@ def verdict_of(statuses: dict) -> dict:
     }
 
 
-def compare_verdict(statuses: dict, verdict: dict) -> list[str]:
+def rollup_fields(manifest: dict | None, options: dict, statuses: dict) -> dict:
+    """The three verdict fields that follow from the claim and the caller's configuration (section 7).
+
+    Small, and worth comparing: they are the part of a verdict a program reads without opening the claim -
+    which the format lifted out on purpose (D-026) - and each has a rule rather than a judgement behind it.
+    """
+    capture = manifest.get("capture") if isinstance(manifest, dict) and isinstance(manifest.get("capture"), dict) else {}
+    profile = capture.get("profile") if isinstance(capture.get("profile"), str) else None
+
+    signed = statuses.get("signature.verify")
+    attribution = {
+        # `invalid` and `none` are different sentences: one says the signature is wrong, the other says
+        # there was nothing to check. A verdict that merged them would lose the only distinction L1 makes.
+        "status": "valid" if signed == "pass" else ("invalid" if signed == "fail" else "none"),
+        "key_trusted": key_trust(manifest, options),
+    }
+
+    # `anchored` means an anchor *verified*, and section 8.4 draws the distinction the other way round:
+    # a chain anchor attests ordering within an archive, so it bounds the claim without giving anybody a
+    # time. The kit records the bound, not the instant, so a verified chain is `anchored` here.
+    time_bound = "anchored" if statuses.get("anchor.verified") == "pass" else "claimed_only"
+
+    return {"capture_profile": profile, "attribution": attribution, "time_bound": time_bound}
+
+
+def key_trust(manifest: dict | None, options: dict) -> str:
+    """Whether the caller says this key is somebody's (section 6.7).
+
+    `trustedKeys` is a list of key ids, and it is the only account of whose key this is that did *not* come
+    from the receipt. A caller that names none gets `not_checked` - not a criticism of the receipt, but the
+    honest state of a question the format deliberately leaves to its reader.
+
+    `keyDirectory` is the richer form of the same configuration, and this implementation does not read one:
+    a caller who supplies only that is reported as `not_checked` rather than guessed at, which is wrong in the
+    one direction that matters least.
+    """
+    named = options.get("trustedKeys")
+    if not isinstance(named, list) or not named:
+        return "not_checked"
+
+    signature = manifest.get("signature") if isinstance(manifest, dict) else None
+    key_id = None
+    if isinstance(signature, dict):
+        public_key = signature.get("public_key")
+        if isinstance(public_key, str):
+            try:
+                key_id = hashlib.sha256(from_base64url(public_key)).hexdigest()
+            except Exception:
+                key_id = None
+        if key_id is None and isinstance(signature.get("key_id"), str):
+            key_id = signature["key_id"]
+
+    return "trusted" if key_id in named else "untrusted"
+
+
+def compare_verdict(statuses: dict, verdict: dict, fields: dict | None = None) -> list[str]:
     """What the rollup disagrees with the record about - the fields section 11 asks for by name."""
-    expected = verdict_of(statuses)
+    expected = {**verdict_of(statuses), **(fields or {})}
     problems = []
-    for field in ("verified", "exit_code"):
-        if field in verdict and expected[field] != verdict[field]:
+    for field in ("verified", "exit_code", "capture_profile", "time_bound", "attribution"):
+        if field in verdict and expected.get(field, verdict[field]) != verdict[field]:
             problems.append(
                 "%s: this implementation says %s, and the record says %s"
-                % (field, expected[field], verdict[field])
+                % (field, expected.get(field), verdict[field])
             )
     recorded_levels = verdict.get("levels") or {}
     for level, status in expected["levels"].items():
@@ -675,10 +735,10 @@ def main(argv: list[str]) -> int:
         "specification %s, vectors recorded by verifier %s"
         % (record["spec_version"], record["verifier_version"])
     )
-    print("this implementation covers all 21 checks of section 7.4 and rolls them up into `verified`,")
-    print("`exit_code` and the four levels; it does not yet produce the capture profile, attribution, the")
-    print("time bound or a caveat count, so it is not offered as a conforming implementation -")
-    print("see conformance/README.md")
+    print("this implementation covers all 21 checks of section 7.4, rolls them up into `verified`,")
+    print("`exit_code` and the four levels, and compares the claim hash, the capture profile, attribution")
+    print("and the time bound; the one field it does not produce is a caveat count - see")
+    print("conformance/README.md")
     return 0 if failures == 0 else 1
 
 
